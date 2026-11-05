@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-KintaiApplication<kintai>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.hackathon.kintai.KintaiApplication",
+            "projectName": "kintai",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
