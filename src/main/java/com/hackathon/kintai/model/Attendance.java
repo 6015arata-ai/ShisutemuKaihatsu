@@ -25,6 +25,14 @@ public class Attendance {
     // 🆕 管理者が手動で修正・入力した休憩時間（分）
     private Integer breakMinutes;
 
+    // 🆕 詳細設計書準拠：勤務場所（最大100文字）
+    @Column(name = "work_place", length = 100)
+    private String workPlace;
+
+    // 🆕 詳細設計書準拠：残業理由（最大500文字）
+    @Column(name = "overtime_reason", length = 500)
+    private String overtimeReason;
+
     // 内部計算用の「最終的な休憩時間（分）」を取得
     public int getCalculatedBreakMinutes() {
         if (breakMinutes != null) {
@@ -36,7 +44,7 @@ public class Attendance {
         return 0; // 休憩なし
     }
 
-    // 🆕 画面表示用の休憩時間（例：1時間0分、45分など）
+    // 画面表示用の休憩時間（例：1時間0分、45分など）
     public String getBreakTimeDisplay() {
         int mins = getCalculatedBreakMinutes();
         if (mins == 0) return "0分";

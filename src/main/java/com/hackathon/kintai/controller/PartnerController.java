@@ -135,20 +135,64 @@ public class PartnerController {
         return "partner_dash";
     }
 
-    // 出勤打刻
-    @PostMapping("/clock-in")
-    public String clockIn(HttpSession session) {
+    // 🆕 詳細設計書準拠: 出退勤打刻の統合処理 (POST /partner/attendance/clock)
+    @PostMapping("/attendance/clock")
+    public String clockAttendance(
+            @RequestParam("type") String type, // 0: 出勤, 1: 退勤
+            @RequestParam(value = "work_place", required = false) String workPlace,
+            @RequestParam(value = "overtime_reason", required = false) String overtimeReason,
+            HttpSession session,
+            RedirectAttributes ra) {
+        
         if (isInvalidSession(session)) return "redirect:/?error=already_logged_in";
         User user = (User) session.getAttribute("user");
         
+        // 最後に打刻したレコード（まだ退勤していないもの）を取得
         Attendance active = attendanceRepo.findTopByUserIdAndEndTimeIsNullOrderByStartTimeDesc(user.getUserId());
-        if (active == null) {
+
+        if ("0".equals(type)) {
+            // ▼ 出勤処理
+            if (active != null) {
+                ra.addFlashAttribute("errorMsg", "すでに出勤しています。");
+                return "redirect:/partner";
+            }
+            // 必須チェック（詳細設計: 出勤時は勤務場所必須）
+            if (workPlace == null || workPlace.trim().isEmpty()) {
+                ra.addFlashAttribute("errorMsg", "出勤時は勤務場所の入力が必須です。");
+                return "redirect:/partner";
+            }
+            // 文字数チェック
+            if (workPlace.length() > 100) {
+                ra.addFlashAttribute("errorMsg", "勤務場所は100文字以内で入力してください。");
+                return "redirect:/partner";
+            }
+
             Attendance a = new Attendance();
             a.setUserId(user.getUserId());
             a.setUserName(user.getName());
             a.setStartTime(LocalDateTime.now());
+            a.setWorkPlace(workPlace); // 勤務場所を保存
             attendanceRepo.save(a);
+
+        } else if ("1".equals(type)) {
+            // ▼ 退勤処理
+            if (active == null) {
+                ra.addFlashAttribute("errorMsg", "出勤打刻がされていません。");
+                return "redirect:/partner";
+            }
+            // 文字数チェック（残業理由は任意入力）
+            if (overtimeReason != null && overtimeReason.length() > 500) {
+                ra.addFlashAttribute("errorMsg", "残業理由は500文字以内で入力してください。");
+                return "redirect:/partner";
+            }
+
+            active.setEndTime(LocalDateTime.now());
+            if (overtimeReason != null && !overtimeReason.trim().isEmpty()) {
+                active.setOvertimeReason(overtimeReason); // 残業理由を保存
+            }
+            attendanceRepo.save(active);
         }
+
         return "redirect:/partner";
     }
 
@@ -175,20 +219,6 @@ public class PartnerController {
         
         if (a != null && a.getBreakStartTime() != null && a.getBreakEndTime() == null) {
             a.setBreakEndTime(LocalDateTime.now());
-            attendanceRepo.save(a);
-        }
-        return "redirect:/partner";
-    }
-
-    // 退勤打刻
-    @PostMapping("/clock-out")
-    public String clockOut(HttpSession session) {
-        if (isInvalidSession(session)) return "redirect:/?error=already_logged_in";
-        User user = (User) session.getAttribute("user");
-        Attendance a = attendanceRepo.findTopByUserIdAndEndTimeIsNullOrderByStartTimeDesc(user.getUserId());
-        
-        if (a != null && a.getEndTime() == null) {
-            a.setEndTime(LocalDateTime.now());
             attendanceRepo.save(a);
         }
         return "redirect:/partner";

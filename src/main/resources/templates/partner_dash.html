@@ -74,16 +74,13 @@
         margin-left: auto !important;
         margin-right: auto !important;
     }
-}
-
+    
     /* 5. 余白リセット */
     .navbar-nav.ms-auto {
         margin-left: auto !important;
         margin-right: auto !important;
         gap: 0 !important;
     }
-    
-
     
     /* サイドバーを非表示（none）から「表示」に変更 */
     .admin-sidebar {
@@ -151,7 +148,6 @@
     #live-clock { font-family: 'Courier New', monospace; }
 </style>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
 </head>
@@ -218,6 +214,12 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
 
+        <!-- 🔔 Controllerのバリデーションエラーメッセージを表示するエリア -->
+        <div th:if="${errorMsg}" class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+            <span th:text="${errorMsg}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
         <div th:if="${param.error}" class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
             <span th:if="${param.error[0] == 'invalid_characters'}">パスワードに全角文字や使用できない文字が含まれています。</span>
             <span th:if="${param.error[0] == 'password_mismatch'}">確認用パスワードが一致しません。</span>
@@ -229,18 +231,41 @@
             <h2 class="mb-2 fw-bold text-dark">打刻パネル</h2>
             <div class="h3 text-primary fw-bold mb-4" id="live-clock">00:00:00</div>
             <div class="d-flex justify-content-center gap-3 flex-wrap">
-                <form action="/partner/clock-in" method="post" onsubmit="return singleSubmit(this)">
-                    <button type="submit" class="btn btn-lg px-5 shadow-sm fw-bold" th:classappend="${status == 'OFF' ? 'btn-primary' : 'btn-secondary opacity-50'}" th:disabled="${status != 'OFF'}">出勤</button>
+                
+                <!-- 🆕 出勤フォーム（勤務場所付き） -->
+                <form action="/partner/attendance/clock" method="post" onsubmit="return singleSubmit(this)" class="border p-3 rounded bg-white shadow-sm" th:if="${status == 'OFF'}">
+                    <input type="hidden" name="type" value="0">
+                    <div class="mb-3 text-start">
+                        <label for="work_place" class="form-label fw-bold small text-muted">勤務場所 <span class="text-danger">*必須</span></label>
+                        <input type="text" id="work_place" name="work_place" class="form-control" maxlength="100" required placeholder="本社、リモート など">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg px-5 shadow-sm fw-bold w-100">出勤</button>
                 </form>
+                <!-- 出勤済みの場合はグレーのボタンだけ表示 -->
+                <button th:if="${status != 'OFF'}" type="button" class="btn btn-secondary btn-lg px-5 opacity-50 fw-bold" disabled>出勤</button>
+
+                <!-- 休憩入りフォーム（そのまま） -->
                 <form action="/partner/break-start" method="post" onsubmit="return singleSubmit(this)">
-                    <button type="submit" class="btn btn-lg px-4 shadow-sm fw-bold text-white" th:classappend="${status == 'WORK' ? 'btn-warning' : 'btn-secondary opacity-50'}" th:disabled="${status != 'WORK'}">休憩入り</button>
+                    <button type="submit" class="btn btn-lg px-4 shadow-sm fw-bold text-white h-100" th:classappend="${status == 'WORK' ? 'btn-warning' : 'btn-secondary opacity-50'}" th:disabled="${status != 'WORK'}">休憩入り</button>
                 </form>
+
+                <!-- 休憩戻りフォーム（そのまま） -->
                 <form action="/partner/break-end" method="post" onsubmit="return singleSubmit(this)">
-                    <button type="submit" class="btn btn-lg px-4 shadow-sm fw-bold" th:classappend="${status == 'REST' ? 'btn-success' : 'btn-secondary opacity-50'}" th:disabled="${status != 'REST'}">休憩戻り</button>
+                    <button type="submit" class="btn btn-lg px-4 shadow-sm fw-bold h-100" th:classappend="${status == 'REST' ? 'btn-success' : 'btn-secondary opacity-50'}" th:disabled="${status != 'REST'}">休憩戻り</button>
                 </form>
-                <form action="/partner/clock-out" method="post" onsubmit="return singleSubmit(this)">
-                    <button type="submit" class="btn btn-lg px-5 shadow-sm fw-bold" th:classappend="${status == 'WORK' ? 'btn-danger' : 'btn-secondary opacity-50'}" th:disabled="${status != 'WORK'}">退勤</button>
+
+                <!-- 🆕 退勤フォーム（残業理由付き） -->
+                <form action="/partner/attendance/clock" method="post" onsubmit="return singleSubmit(this)" class="border p-3 rounded bg-white shadow-sm" th:if="${status == 'WORK'}">
+                    <input type="hidden" name="type" value="1">
+                    <div class="mb-3 text-start">
+                        <label for="overtime_reason" class="form-label fw-bold small text-muted">残業理由 <span class="text-secondary">(任意)</span></label>
+                        <textarea id="overtime_reason" name="overtime_reason" class="form-control" rows="2" maxlength="500" placeholder="残業理由を入力"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-danger btn-lg px-5 shadow-sm fw-bold w-100">退勤</button>
                 </form>
+                <!-- 勤務中以外はグレーのボタンだけ表示 -->
+                <button th:if="${status != 'WORK'}" type="button" class="btn btn-secondary btn-lg px-5 opacity-50 fw-bold" disabled>退勤</button>
+
             </div>
         </div>
 
@@ -262,19 +287,24 @@
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
-                        <tr><th>日付</th><th>出勤</th><th>退勤</th><th>休憩開始</th><th>休憩終了</th><th>実働時間</th></tr>
+                        <!-- 🆕 勤務場所と残業理由の列を追加 -->
+                        <tr><th>日付</th><th>勤務場所</th><th>出勤</th><th>退勤</th><th>休憩開始</th><th>休憩終了</th><th>実働時間</th><th>残業理由</th></tr>
                     </thead>
                     <tbody>
                         <tr th:each="h : ${myHistories}">
                             <td th:text="${#temporals.format(h.startTime, 'yyyy/MM/dd')}"></td>
+                            <!-- 🆕 勤務場所を表示 -->
+                            <td th:text="${h.workPlace != null ? h.workPlace : '-'}"></td>
                             <td th:text="${#temporals.format(h.startTime, 'HH:mm')}" class="fw-bold"></td>
                             <td th:text="${h.endTime != null ? #temporals.format(h.endTime, 'HH:mm') : '-'}"></td>
                             <td th:text="${h.breakStartTime != null ? #temporals.format(h.breakStartTime, 'HH:mm') : '-'}"></td>
                             <td th:text="${h.breakEndTime != null ? #temporals.format(h.breakEndTime, 'HH:mm') : '-'}"></td>
                             <td class="fw-bold text-success" th:text="${h.workTime}"></td>
+                            <!-- 🆕 残業理由を表示（長すぎたら省略表示にする小技） -->
+                            <td th:text="${h.overtimeReason != null ? h.overtimeReason : '-'}" class="text-truncate" style="max-width: 150px;" th:title="${h.overtimeReason}"></td>
                         </tr>
                         <tr th:if="${#lists.isEmpty(myHistories)}">
-                            <td colspan="6" class="text-center py-4 text-muted">データがありません。</td>
+                            <td colspan="8" class="text-center py-4 text-muted">データがありません。</td>
                         </tr>
                     </tbody>
                 </table>
@@ -282,6 +312,7 @@
         </div>
     </div>
 
+    <!-- パスワード変更モーダル (変更なし) -->
     <div class="modal fade" id="pwModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content border-0 shadow">
