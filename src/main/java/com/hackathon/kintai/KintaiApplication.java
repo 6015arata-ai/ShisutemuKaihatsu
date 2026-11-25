@@ -18,15 +18,16 @@ public class KintaiApplication {
     @Bean
     CommandLineRunner init(UserRepository repo) {
         return args -> {
-            // ユーザーが一人もいない時だけ、初期管理者を作成する
             if (repo.count() == 0) {
                 User admin = new User();
                 admin.setUserId("admin");
+                admin.setPasswordHash("admin123"); // ※後ほどBCrypt等でハッシュ化に切り替え
                 admin.setName("管理者");
-                admin.setPassword("admin123");
                 admin.setRole("ADMIN");
+                admin.setDepartment("管理部");
+                admin.setIsActive(true);
                 repo.save(admin);
-                System.out.println("★初期管理者を登録しました (ID: admin / Pass: admin123)");
+                System.out.println("★初期管理者を自動登録しました (ID: admin)");
             }
         };
     }

@@ -175,6 +175,7 @@
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end shadow">
                             <li><h6 class="dropdown-header">アカウント管理</h6></li>
+                            <li><a class="dropdown-item py-2" href="#" data-bs-toggle="modal" data-bs-target="#profileModal">📞 連絡先設定</a></li>
                             <li><a class="dropdown-item py-2" href="#" data-bs-toggle="modal" data-bs-target="#pwModal">🔑 パスワード変更</a></li>
                         </ul>
                     </div>
@@ -312,6 +313,38 @@
         </div>
     </div>
 
+    <!-- 連絡先登録・変更モーダル -->
+    <div class="modal fade" id="profileModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <form action="/partner/profile/update" method="post" onsubmit="return singleSubmit(this)">
+                    <div class="modal-header bg-dark text-white">
+                        <h5 class="modal-title fs-6">連絡先登録・変更</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body py-3">
+                        <div class="mb-3">
+                            <label for="telephoneNum" class="form-label small fw-bold text-muted">電話番号</label>
+                            <input type="text" name="telephoneNum" id="telephoneNum" class="form-control"
+                                   maxlength="15" th:value="${user != null ? user.telephoneNum : ''}"
+                                   placeholder="例：090-1234-5678">
+                        </div>
+                        <div>
+                            <label for="mailAddress" class="form-label small fw-bold text-muted">メールアドレス</label>
+                            <input type="email" name="mailAddress" id="mailAddress" class="form-control"
+                                   maxlength="100" th:value="${user != null ? user.mailAddress : ''}"
+                                   placeholder="例：user@example.com">
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                        <button type="submit" class="btn btn-sm btn-primary px-3">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- パスワード変更モーダル (変更なし) -->
     <div class="modal fade" id="pwModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-sm">
@@ -337,105 +370,3 @@
                                 <input type="password" name="confirmPassword" id="confirmPassword" class="form-control form-control-password" required minlength="4" placeholder="Confirm password">
                                 <button class="btn password-toggle-btn" type="button" id="toggleConfirmPassword">
                                     <i class="bi bi-eye-slash" id="eyeIconConfirm"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer bg-light">
-                        <button type="submit" class="btn btn-sm btn-primary px-3">保存</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        function updateClock() {
-            const el = document.getElementById('live-clock');
-            if(el) el.textContent = new Date().toLocaleTimeString('ja-JP', {hour12:false});
-        }
-        setInterval(updateClock, 1000); updateClock();
-
-        function singleSubmit(form) {
-            const btn = form.querySelector('button[type="submit"]');
-            if (btn) {
-                btn.disabled = true;
-                btn.textContent = '処理中...'; 
-            }
-            return true;
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            const startDateEl = document.getElementById('startDate');
-            const endDateEl = document.getElementById('endDate');
-            const savedStart = startDateEl ? startDateEl.value : null;
-            const savedEnd = endDateEl ? endDateEl.value : null;
-            
-            if (document.getElementById('rangePicker')) {
-                flatpickr("#rangePicker", {
-                    locale: {
-                        ...flatpickr.l10ns.ja,
-                        rangeSeparator: " ～ "
-                    },
-                    mode: "range",
-                    dateFormat: "Y-m-d",
-                    defaultDate: (savedStart && savedEnd) ? [savedStart, savedEnd] : null,
-                    onClose: function(selectedDates) {
-                        if (selectedDates.length === 2) {
-                            const tzOffset = selectedDates[0].getTimezoneOffset() * 60000;
-                            const startLocal = new Date(selectedDates[0].getTime() - tzOffset);
-                            const endLocal = new Date(selectedDates[1].getTime() - tzOffset);
-                            
-                            document.getElementById('startDate').value = startLocal.toISOString().slice(0, 10);
-                            document.getElementById('endDate').value = endLocal.toISOString().slice(0, 10);
-                            
-                            document.getElementById('searchForm').submit();
-                        }
-                    }
-                });
-            }
-
-            const setupToggle = (btnId, fieldId, iconId) => {
-                const btn = document.getElementById(btnId);
-                const field = document.getElementById(fieldId);
-                const icon = document.getElementById(iconId);
-
-                if (btn && field && icon) {
-                    btn.addEventListener('click', () => {
-                        const type = field.type === 'password' ? 'text' : 'password';
-                        field.type = type;
-                        icon.classList.toggle('bi-eye-slash');
-                        icon.classList.toggle('bi-eye');
-                    });
-                }
-            };
-
-            setupToggle('toggleNewPassword', 'newPassword', 'eyeIconNew');
-            setupToggle('toggleConfirmPassword', 'confirmPassword', 'eyeIconConfirm');
-
-            const normalizeInput = (el) => {
-                const start = el.selectionStart;
-                const end = el.selectionEnd;
-                const value = el.value;
-                const result = value.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
-                if (value !== result) {
-                    el.value = result;
-                    el.setSelectionRange(start, end);
-                }
-            };
-
-            const modalPasswordFields = [
-                document.getElementById('newPassword'), 
-                document.getElementById('confirmPassword')
-            ];
-
-            modalPasswordFields.forEach(field => {
-                if (!field) return;
-                field.addEventListener('input', (e) => { if (!e.isComposing) normalizeInput(field); });
-                field.addEventListener('compositionend', () => normalizeInput(field));
-                field.addEventListener('blur', () => normalizeInput(field));
-            });
-        });
-    </script>
-</body>
-</html>

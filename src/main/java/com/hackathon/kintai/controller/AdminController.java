@@ -3,7 +3,7 @@ package com.hackathon.kintai.controller;
 import com.hackathon.kintai.model.*;
 import com.hackathon.kintai.repository.*;
 import jakarta.servlet.http.HttpSession;
-import jakarta.servlet.http.HttpServletResponse; // 💡 追加
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -13,11 +13,13 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 @Controller
 @RequestMapping("/admin")
@@ -25,28 +27,23 @@ public class AdminController {
 
     @Autowired private UserRepository userRepo;
     @Autowired private AttendanceRepository attendanceRepo;
-    @Autowired private ShiftRepository shiftRepo; // Supabaseのシフトテーブル用リポジトリ
+    @Autowired private ShiftRepository shiftRepo;
 
-    // 💡 管理者のセッションチェックを行う共通ロジック
+    // 管理者セッションチェック（新しいUserのuserId / roleで判定）
     private boolean isInvalidAdminSession(HttpSession session) {
         User sessionUser = (User) session.getAttribute("user");
-        if (sessionUser == null || !"ADMIN".equals(sessionUser.getRole())) return true;
-        
-        User dbUser = userRepo.findById(sessionUser.getId()).orElse(null);
-        if (dbUser == null) {
-            session.invalidate();
+        if (sessionUser == null || !"ADMIN".equals(sessionUser.getRole()) || sessionUser.getUserId() == null) {
             return true;
         }
-        
-        String currentSessionId = session.getId();
-        if (dbUser.getCurrentSessionId() == null || !dbUser.getCurrentSessionId().equals(currentSessionId)) {
+
+        User dbUser = userRepo.findById(sessionUser.getUserId()).orElse(null);
+        if (dbUser == null || Boolean.FALSE.equals(dbUser.getIsActive())) {
             session.invalidate();
             return true;
         }
         return false;
     }
 
-    // 💡 キャッシュを禁止する共通ヘッダー設定
     private void setNoCacheHeaders(HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         response.setHeader("Pragma", "no-cache");
@@ -60,13 +57,50 @@ public class AdminController {
         if (end != null && !end.isEmpty()) attrs.addAttribute("endDate", end);
     }
 
+    private String normalizeTargetMonth(String rawMonth) {
+        if (rawMonth == null || rawMonth.trim().isEmpty()) {
+            return LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+        }
+        String trimmed = rawMonth.trim();
+        return trimmed.length() > 7 ? trimmed.substring(0, 7) : trimmed;
+    }
+
+    private String trimOrNull(String val) {
+        if (val == null) return null;
+        String t = val.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    // 1〜15日 = "前半"、16日以降 = "後半"
+    private String resolvePeriodType(String explicitPeriodType, int dayOfMonth) {
+        String trimmed = trimOrNull(explicitPeriodType);
+        if ("前半".equals(trimmed) || "後半".equals(trimmed)) {
+            return trimmed;
+        }
+        return (dayOfMonth <= 15) ? "前半" : "後半";
+    }
+
+    private LocalDateTime parseTimeToDateTime(String rawTime, LocalDate baseDate) {
+        String val = trimOrNull(rawTime);
+        if (val == null) return null;
+
+        try {
+            if (val.contains("T")) {
+                return LocalDateTime.parse(val);
+            }
+            LocalTime lt = LocalTime.parse(val);
+            return LocalDateTime.of(baseDate, lt);
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+    }
+
     @GetMapping
     public String dashboard(HttpSession session, HttpServletResponse response, Model model,
                             @RequestParam(name = "userId", required = false) String userId,
                             @RequestParam(name = "month", required = false) String month,
                             @RequestParam(name = "startDate", required = false) String startDate,
                             @RequestParam(name = "endDate", required = false) String endDate) {
-        // 🌟 1. 管理者チェック & 2. キャッシュ禁止ヘッダー適用
         if (isInvalidAdminSession(session)) return "redirect:/?error=already_logged_in";
         setNoCacheHeaders(response);
 
@@ -105,29 +139,40 @@ public class AdminController {
         model.addAttribute("selectedEndDate", endDate);
         model.addAttribute("histories", histories);
 
-        // シフトデータの取得・復元処理
-        String targetMonth = (month != null && !month.isEmpty()) ? month : YearMonth.now().toString();
+        // シフトデータの取得・復元処理（新スキーマ targetMonth / startTime / endTime / leaveType に準拠）
         List<Shift> dbShifts = shiftRepo.findAll();
-
         Map<String, String> savedShifts = new HashMap<>();
+        DateTimeFormatter hmFormatter = DateTimeFormatter.ofPattern("HH:mm");
+
         for (Shift s : dbShifts) {
-            String currentUid = s.getUserId();
+            String rawUid = s.getUserId();
+            if (rawUid == null || s.getTargetMonth() == null) continue;
+
+            String ymStr = s.getTargetMonth().trim();
+            if (ymStr.isEmpty()) continue;
+
+            String currentUid = rawUid.trim();
             if ("0".equals(currentUid) || "minus".equals(currentUid) || "none".equals(currentUid)) {
-                if ("0".equals(currentUid)) {
-                    currentUid = "minus";
-                }
-                if (s.getShiftIn() != null && !s.getShiftIn().isEmpty()) {
-                    savedShifts.put("shift_minus_" + currentUid + "_" + s.getYearMonth() + "_" + s.getDay(), s.getShiftIn());
+                currentUid = "minus";
+                int day = (s.getStartTime() != null) ? s.getStartTime().getDayOfMonth() : 1;
+                String minusVal = (s.getLeaveType() != null && !s.getLeaveType().trim().isEmpty())
+                        ? s.getLeaveType().trim()
+                        : ((s.getStartTime() != null) ? s.getStartTime().format(hmFormatter) : "");
+                if (!minusVal.isEmpty()) {
+                    savedShifts.put("shift_minus_" + currentUid + "_" + ymStr + "_" + day, minusVal);
                 }
             } else {
-                if (s.getShiftIn() != null && !s.getShiftIn().isEmpty()) {
-                    savedShifts.put("shift_in_" + currentUid + "_" + s.getYearMonth() + "_" + s.getDay(), s.getShiftIn());
+                if (s.getStartTime() != null) {
+                    int day = s.getStartTime().getDayOfMonth();
+                    savedShifts.put("shift_in_" + currentUid + "_" + ymStr + "_" + day, s.getStartTime().format(hmFormatter));
                 }
-                if (s.getShiftOut() != null && !s.getShiftOut().isEmpty()) {
-                    savedShifts.put("shift_out_" + currentUid + "_" + s.getYearMonth() + "_" + s.getDay(), s.getShiftOut());
+                if (s.getEndTime() != null) {
+                    int day = s.getEndTime().getDayOfMonth();
+                    savedShifts.put("shift_out_" + currentUid + "_" + ymStr + "_" + day, s.getEndTime().format(hmFormatter));
                 }
             }
         }
+        model.addAttribute("shifts", dbShifts);
         model.addAttribute("savedShifts", savedShifts);
 
         return "admin_dash";
@@ -135,33 +180,90 @@ public class AdminController {
 
     @PostMapping("/register")
     public String register(HttpSession session, HttpServletResponse response,
-                           @RequestParam String name, @RequestParam String password, @RequestParam String role,
-                           @RequestParam(required = false) String filterUserId, @RequestParam(required = false) String filterMonth,
-                           @RequestParam(required = false) String filterStartDate, @RequestParam(required = false) String filterEndDate,
+                           @RequestParam String name,
+                           @RequestParam String password,
+                           @RequestParam String role,
+                           @RequestParam(required = false, defaultValue = "未設定") String department,
+                           @RequestParam(required = false) String workPlace,
+                           @RequestParam(required = false) String filterUserId,
+                           @RequestParam(required = false) String filterMonth,
+                           @RequestParam(required = false) String filterStartDate,
+                           @RequestParam(required = false) String filterEndDate,
                            RedirectAttributes redirectAttributes) {
         if (isInvalidAdminSession(session)) return "redirect:/?error=already_logged_in";
         setNoCacheHeaders(response);
 
-        User user = new User();
-        user.setName(name);
-        user.setPassword(password);
-        user.setRole(role);
+        String deptValue = (department == null || department.isBlank()) ? "未設定" : department.trim();
+        String branchValue = (workPlace == null || workPlace.isBlank()) ? null : workPlace.trim();
 
-        // 💡 重複を絶対に防ぐ安全な採番ロジック
-        // DB内の全ユーザーから、最大のuser_id（を数値変換したもの）を見つけて +1 する
+        if (branchValue != null && branchValue.length() > 100) {
+            redirectAttributes.addFlashAttribute("error", "【エラー】勤務拠点は100文字以内で入力してください。");
+            keepFilters(redirectAttributes, filterUserId, filterMonth, filterStartDate, filterEndDate);
+            return "redirect:/admin";
+        }
+
+        User user = new User();
+        user.setName(name.trim());
+        user.setPasswordHash(password); // ※後ほどハッシュ化に置換
+        user.setRole(role);
+        user.setDepartment(deptValue);
+        user.setWorkPlace(branchValue);
+        user.setIsActive(true);
+
         int maxId = userRepo.findAll().stream()
                 .map(u -> {
                     try {
                         return Integer.parseInt(u.getUserId());
                     } catch (NumberFormatException e) {
-                        return 1000; // 数値変換できないイレギュラーなID（admin等）は1000として扱う
+                        return 1000;
                     }
                 })
                 .max(Integer::compareTo)
-                .orElse(1000); // 1人もいない場合は1000からスタート
+                .orElse(1000);
 
-        user.setUserId(String.valueOf(maxId + 1)); // 最大のIDの「次の番号」を確実に割り当てる
+        user.setUserId(String.valueOf(maxId + 1));
         userRepo.save(user);
+
+        keepFilters(redirectAttributes, filterUserId, filterMonth, filterStartDate, filterEndDate);
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/update-department")
+    public String updateDepartment(HttpSession session, HttpServletResponse response,
+                                   @RequestParam String targetId,
+                                   @RequestParam(required = false) String department,
+                                   @RequestParam(required = false) String workPlace,
+                                   @RequestParam(required = false) String filterUserId,
+                                   @RequestParam(required = false) String filterMonth,
+                                   @RequestParam(required = false) String filterStartDate,
+                                   @RequestParam(required = false) String filterEndDate,
+                                   RedirectAttributes redirectAttributes) {
+        if (isInvalidAdminSession(session)) return "redirect:/?error=already_logged_in";
+        setNoCacheHeaders(response);
+
+        User targetUser = userRepo.findById(targetId).orElse(null);
+        if (targetUser != null) {
+            String deptValue = (department == null || department.isBlank()) ? "未設定" : department.trim();
+            String branchValue = (workPlace == null || workPlace.isBlank()) ? null : workPlace.trim();
+
+            if (deptValue.length() > 50) {
+                redirectAttributes.addFlashAttribute("error", "【エラー】所属部署は50文字以内で入力してください。");
+                keepFilters(redirectAttributes, filterUserId, filterMonth, filterStartDate, filterEndDate);
+                return "redirect:/admin";
+            }
+            if (branchValue != null && branchValue.length() > 100) {
+                redirectAttributes.addFlashAttribute("error", "【エラー】勤務拠点は100文字以内で入力してください。");
+                keepFilters(redirectAttributes, filterUserId, filterMonth, filterStartDate, filterEndDate);
+                return "redirect:/admin";
+            }
+
+            targetUser.setDepartment(deptValue);
+            targetUser.setWorkPlace(branchValue);
+            userRepo.save(targetUser);
+            redirectAttributes.addFlashAttribute("success", targetUser.getName() + " の所属情報を更新しました。");
+        } else {
+            redirectAttributes.addFlashAttribute("error", "【エラー】対象ユーザーが見つかりませんでした。");
+        }
 
         keepFilters(redirectAttributes, filterUserId, filterMonth, filterStartDate, filterEndDate);
         return "redirect:/admin";
@@ -220,7 +322,7 @@ public class AdminController {
 
     @PostMapping("/delete-user")
     public String deleteUser(HttpSession session, HttpServletResponse response,
-                             @RequestParam Long targetId, @RequestParam String adminPassword,
+                             @RequestParam String targetId, @RequestParam String adminPassword,
                              @RequestParam(required = false) String filterUserId, @RequestParam(required = false) String filterMonth,
                              @RequestParam(required = false) String filterStartDate, @RequestParam(required = false) String filterEndDate,
                              RedirectAttributes redirectAttributes) {
@@ -229,7 +331,7 @@ public class AdminController {
 
         User admin = (User) session.getAttribute("user");
         if (admin != null) {
-            if (!admin.getPassword().equals(adminPassword)) {
+            if (!admin.getPasswordHash().equals(adminPassword)) {
                 redirectAttributes.addFlashAttribute("error", "【エラー】パスワードが間違っています。削除できませんでした。");
                 keepFilters(redirectAttributes, filterUserId, filterMonth, filterStartDate, filterEndDate);
                 return "redirect:/admin";
@@ -295,11 +397,10 @@ public class AdminController {
             }
         }
 
-        User targetUser = userRepo.findAll().stream().filter(u -> u.getUserId().equals(targetUserId)).findFirst().orElse(null);
+        User targetUser = userRepo.findById(targetUserId).orElse(null);
         if (targetUser != null) {
             Attendance a = new Attendance();
             a.setUserId(targetUser.getUserId());
-            a.setUserName(targetUser.getName());
             a.setStartTime(start);
             a.setEndTime(end);
             a.setBreakMinutes(breakMinutes);
@@ -334,33 +435,40 @@ public class AdminController {
     @PostMapping("/save-shifts")
     public String saveShifts(HttpSession session, HttpServletResponse response,
                              @RequestParam Map<String, String> allParams,
-                             @RequestParam(required = false) String month, 
+                             @RequestParam(required = false) String month,
                              @RequestParam(required = false) String userId,
-                             @RequestParam(required = false) String startDate, 
+                             @RequestParam(required = false) String startDate,
                              @RequestParam(required = false) String endDate,
                              RedirectAttributes redirectAttributes) {
-        
-        // 🌟 管理者チェック & キャッシュ禁止ヘッダーをがっちり防御
+
         if (isInvalidAdminSession(session)) return "redirect:/?error=already_logged_in";
         setNoCacheHeaders(response);
 
         try {
-            // 🚀 JavaScriptから届いた「変更されたマス（hidden要素）」の数だけループが回ります
+            LocalDateTime now = LocalDateTime.now();
+
             for (Map.Entry<String, String> entry : allParams.entrySet()) {
                 String key = entry.getKey();
-                String value = entry.getValue();
+                String value = trimOrNull(entry.getValue());
 
-                // 1. シフト関連のキー（shift_から始まるもの）だけを狙い撃ち（CSRF等を除外）
                 if (key.startsWith("shift_")) {
                     String[] parts = key.split("_");
                     if (parts.length < 5) continue;
 
-                    String type = parts[1]; // "in", "out", "minus"
-                    int dayNum = Integer.parseInt(parts[parts.length - 1]); // 末尾は必ず日付
-                    String recordMonth = parts[parts.length - 2];           // 末尾から2番目は必ず年月
+                    String type = parts[1];
+                    int dayNum;
+                    try {
+                        dayNum = Integer.parseInt(parts[parts.length - 1]);
+                    } catch (NumberFormatException e) {
+                        continue;
+                    }
 
-                    // 2. ユーザーIDの復元（minus行の例外処理と、IDに「_」が含まれる場合の結合処理を維持）
-                    String shiftUserId = "";
+                    String recordMonth = normalizeTargetMonth(parts[parts.length - 2]);
+                    YearMonth ym = YearMonth.parse(recordMonth);
+                    int safeDay = Math.max(1, Math.min(dayNum, ym.lengthOfMonth()));
+                    LocalDate baseDate = ym.atDay(safeDay);
+
+                    String shiftUserId;
                     if ("minus".equals(type)) {
                         shiftUserId = "0";
                     } else {
@@ -372,29 +480,26 @@ public class AdminController {
                         shiftUserId = sb.toString();
                     }
 
-                    // 3. 変更があった該当日のデータをDBから1件だけピンポイント検索
-                    Optional<Shift> existingShift = shiftRepo.findByUserIdAndYearMonthAndDay(shiftUserId, recordMonth, dayNum);
-                    Shift shift;
-                    if (existingShift.isPresent()) {
-                        shift = existingShift.get();
-                    } else {
-                        // DBにまだなければ新しくインスタンスを生成
-                        shift = new Shift();
-                        shift.setUserId(shiftUserId);
-                        shift.setYearMonth(recordMonth);
-                        shift.setDay(dayNum);
-                    }
+                    if (value == null) continue;
 
-                    // 4. 「入」「出」「不足人数」に応じて、書き換えられた値だけをピンポイントにセット
+                    Shift shift = new Shift();
+                    shift.setUserId(shiftUserId);
+                    shift.setTargetMonth(recordMonth);
+                    shift.setPeriodType(resolvePeriodType(allParams.get("periodType"), safeDay));
+                    shift.setSubmittedAt(now);
+
                     if ("in".equals(type)) {
-                        shift.setShiftIn(value);
+                        shift.setStartTime(parseTimeToDateTime(value, baseDate));
                     } else if ("out".equals(type)) {
-                        shift.setShiftOut(value);
+                        shift.setEndTime(parseTimeToDateTime(value, baseDate));
                     } else if ("minus".equals(type)) {
-                        shift.setShiftIn(value);
+                        shift.setLeaveType(value);
+                        LocalDateTime dt = parseTimeToDateTime(value, baseDate);
+                        if (dt != null) {
+                            shift.setStartTime(dt);
+                        }
                     }
 
-                    // 5. DBに保存（変更分だけのコミットになるため超高速）
                     shiftRepo.save(shift);
                 }
             }
@@ -403,7 +508,6 @@ public class AdminController {
             redirectAttributes.addFlashAttribute("error", "保存中にエラーが発生しました: " + e.getMessage());
         }
 
-        // 🌟 元の画面に戻ったとき、検索条件（月や従業員フィルター）が外れないように状態をキープ
         keepFilters(redirectAttributes, userId, month, startDate, endDate);
         return "redirect:/admin";
     }

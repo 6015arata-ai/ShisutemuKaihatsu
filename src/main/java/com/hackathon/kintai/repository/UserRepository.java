@@ -6,15 +6,15 @@ import com.hackathon.kintai.model.User;
 import java.util.Optional;
 
 @Repository
-public interface UserRepository extends JpaRepository<User, Long> {
-    // ユーザーIDとパスワードで検索（ログイン用）
-    Optional<User> findByUserIdAndPassword(String userId, String password);
-    
-    // 名前とパスワードで検索（名前でもログインできるように！）
-    Optional<User> findByNameAndPassword(String name, String password);
+public interface UserRepository extends JpaRepository<User, String> {
+    // ユーザーIDとパスワードハッシュで検索
+    Optional<User> findByUserIdAndPasswordHash(String userId, String passwordHash);
+
+    // 名前とパスワードハッシュで検索
+    Optional<User> findByNameAndPasswordHash(String name, String passwordHash);
+
     Optional<User> findByUserIdAndName(String userId, String name);
-    Optional<User> findByUserId(String userId); // これを追加
+    Optional<User> findByUserId(String userId);
     Optional<User> findByName(String name);
-    // ユーザーが何人いるか数える（自動ID割り振りに使用）
     long count();
 }

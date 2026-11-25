@@ -2,14 +2,14 @@ package com.hackathon.kintai.controller;
 
 import com.hackathon.kintai.model.User;
 import com.hackathon.kintai.repository.UserRepository;
-import jakarta.servlet.annotation.WebListener; // 💡 追加
+import jakarta.servlet.annotation.WebListener;
 import jakarta.servlet.http.HttpSessionEvent;
 import jakarta.servlet.http.HttpSessionListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 
-@WebListener // 💡 追加：大元に頼らず、このファイル単体でシステムに自動認識させます！
+@WebListener
 @Component
 public class SessionListener implements HttpSessionListener {
 
@@ -24,25 +24,26 @@ public class SessionListener implements HttpSessionListener {
     @Override
     public void sessionDestroyed(HttpSessionEvent se) {
         if (userRepo == null) {
-            WebApplicationContextUtils
-                .getRequiredWebApplicationContext(se.getSession().getServletContext())
-                .getAutowireCapableBeanFactory()
-                .autowireBean(this);
+            try {
+                WebApplicationContextUtils
+                    .getRequiredWebApplicationContext(se.getSession().getServletContext())
+                    .getAutowireCapableBeanFactory()
+                    .autowireBean(this);
+            } catch (Exception e) {
+                // アプリ終了時などコンテキストが閉じている場合は無視
+            }
         }
 
         User user = (User) se.getSession().getAttribute("user");
-        
-        if (user != null) {
+
+        if (user != null && user.getUserId() != null) {
             try {
-                User dbUser = userRepo.findById(user.getId()).orElse(null);
-                
-                if (dbUser != null && se.getSession().getId().equals(dbUser.getCurrentSessionId())) {
-                    dbUser.setCurrentSessionId(null);
-                    userRepo.save(dbUser);
-                    System.out.println("【自動ロック解除】セッション終了によりDBのロックを解放しました: " + user.getUserId());
+                User dbUser = userRepo.findById(user.getUserId()).orElse(null);
+                if (dbUser != null) {
+                    System.out.println("【セッション終了】ユーザーID: " + dbUser.getUserId());
                 }
             } catch (Exception e) {
-                System.out.println("セッション解放中にエラーが発生しました。: " + e.getMessage());
+                System.out.println("セッション終了処理中にエラーが発生しました: " + e.getMessage());
             }
         }
     }

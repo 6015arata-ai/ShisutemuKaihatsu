@@ -1,25 +1,36 @@
 package com.hackathon.kintai.repository;
 
 import com.hackathon.kintai.model.Shift;
-
-import jakarta.transaction.Transactional;
-
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
-
+@Repository
 public interface ShiftRepository extends JpaRepository<Shift, Long> {
-    // 指定した月の全員のシフトデータをSupabaseからごっそり取得する
-    List<Shift> findAllByYearMonth(String yearMonth);
 
-    // すでに同じ日のデータがあるかチェックする用
-    Optional<Shift> findByUserIdAndYearMonthAndDay(String userId, String yearMonth, int day);
+    @Query("""
+            select s from Shift s
+            where s.userId = :userId
+              and trim(s.targetMonth) = :targetMonth
+            order by s.startTime asc, s.shiftId asc
+            """)
+    List<Shift> findByUserIdAndTargetMonth(
+            @Param("userId") String userId,
+            @Param("targetMonth") String targetMonth);
+
+    @Query("""
+            select s from Shift s
+            where trim(s.targetMonth) = :targetMonth
+            order by s.userId asc, s.startTime asc, s.shiftId asc
+            """)
+    List<Shift> findByTargetMonth(@Param("targetMonth") String targetMonth);
 
     @Modifying
     @Transactional
-    @Query("DELETE FROM Shift s WHERE s.userId = :userId")
-    void deleteByUserId(String userId);
+    @Query("delete from Shift s where s.userId = :userId")
+    void deleteByUserId(@Param("userId") String userId);
 }
