@@ -95,6 +95,8 @@
         </div>
 
         <div th:if="${param.success}" class="alert alert-success py-2">👍 希望シフトを送信しました。</div>
+        <div th:if="${success}" class="alert alert-success py-2" th:text="${success}"></div>
+        <div th:if="${errorMsg}" class="alert alert-danger py-2" th:text="${errorMsg}"></div>
 
         <form th:action="@{/partner/shift/submit}" method="post" id="shiftForm">
             <input type="hidden" name="targetMonth" th:value="${currentMonth}">
@@ -126,6 +128,55 @@
                 <button type="submit" class="btn btn-dark px-4">希望シフトを送信する</button>
             </div>
         </form>
+
+        <!-- 🌴 有給申請・有給残日数セクション -->
+        <div class="card mt-5 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                    <h4 class="fw-bold m-0">🌴 有給申請</h4>
+                    <span class="badge bg-primary fs-6">
+                        有給残日数：<span th:text="${remainingPaidLeaveDays != null ? remainingPaidLeaveDays : 20}">20</span> 日
+                    </span>
+                </div>
+
+                <form th:action="@{/partner/leave/apply}" method="post" class="row g-2 align-items-end mb-4">
+                    <div class="col-auto">
+                        <label for="leaveDate" class="form-label fw-bold mb-1">有給希望日</label>
+                        <input type="date" id="leaveDate" name="leaveDate" class="form-control" required>
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary px-4">有給を申請する</button>
+                    </div>
+                </form>
+
+                <h6 class="fw-bold mb-2">有給申請履歴</h6>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm align-middle m-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>対象日</th>
+                                <th>期間区分</th>
+                                <th>状態</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:if="${myPaidLeaves == null or #lists.isEmpty(myPaidLeaves)}">
+                                <td colspan="3" class="text-center text-muted py-3">有給申請の履歴はありません。</td>
+                            </tr>
+                            <tr th:each="lv : ${myPaidLeaves}">
+                                <td th:text="${lv.startTime != null ? #temporals.format(lv.startTime, 'yyyy-MM-dd') : lv.targetMonth}">2026-12-01</td>
+                                <td th:text="${lv.periodType}">前半</td>
+                                <td>
+                                    <span class="badge"
+                                          th:classappend="${lv.leaveType == '有給(承認)' ? 'bg-success' : (lv.leaveType == '有給(却下)' ? 'bg-danger' : 'bg-warning text-dark')}"
+                                          th:text="${lv.leaveType}">有給(申請)</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="quickInputPanel" class="quick-input-panel">

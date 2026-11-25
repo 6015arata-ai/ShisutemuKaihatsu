@@ -283,6 +283,10 @@
                     data-bs-target="#shift-pane" type="button" role="tab">
                     <i class="bi bi-calendar-week"></i> シフト作成・管理
                 </button>
+                <button class="nav-link text-start btn" id="leave-tab" data-bs-toggle="pill"
+                    data-bs-target="#leave-pane" type="button" role="tab">
+                    <i class="bi bi-calendar-check"></i> 有給申請管理
+                </button>
             </div>
 
             <hr class="my-2 text-muted">
@@ -319,7 +323,7 @@
                         </div>
                         <div class="mb-3">
                             <input type="text" name="workPlace" id="regWorkPlace" class="form-control form-control-sm"
-                                placeholder="※任意 勤務拠点（例：福岡支店）" maxlength="100">
+                                placeholder="※任意 勤務拠点（例：本社、福岡支店）" maxlength="100">
                         </div>
                         <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">登録</button>
                     </form>
@@ -576,6 +580,114 @@
                     </div>
                 </div>
 
+                <div class="tab-pane fade" id="leave-pane" role="tabpanel">
+                    <div class="card shadow-sm border-0 mb-4">
+                        <div class="card-header bg-white border-bottom p-3">
+                            <div class="fw-bold fs-5 mb-1">🌴 有給申請一覧（承認・却下・差し戻し）</div>
+                            <p class="text-muted small mb-0">申請された有給の確認と承認・却下を行います。処理済みの申請は「差し戻し」から申請中へ戻せます。</p>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 10%;">申請ID</th>
+                                            <th style="width: 18%;">ユーザーID</th>
+                                            <th style="width: 18%;">対象日</th>
+                                            <th style="width: 12%;">期間区分</th>
+                                            <th style="width: 14%;">現在の残日数</th>
+                                            <th style="width: 12%;">状態</th>
+                                            <th style="width: 16%;">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr th:if="${paidLeaveRequests == null or #lists.isEmpty(paidLeaveRequests)}">
+                                            <td colspan="7" class="text-center text-muted py-4">有給申請はありません。</td>
+                                        </tr>
+                                        <tr th:each="lv : ${paidLeaveRequests}">
+                                            <td th:text="${lv.shiftId}">1</td>
+                                            <td class="fw-bold" th:text="${lv.userId}">1001</td>
+                                            <td th:text="${lv.startTime != null ? #temporals.format(lv.startTime, 'yyyy-MM-dd') : lv.targetMonth}">2026-12-01</td>
+                                            <td th:text="${lv.periodType}">前半</td>
+                                            <td>
+                                                <span class="badge bg-info text-dark"
+                                                      th:text="${remainingLeaveMap != null and remainingLeaveMap[lv.userId] != null ? remainingLeaveMap[lv.userId] + '日' : '20日'}">20日</span>
+                                            </td>
+                                            <td>
+                                                <span class="badge"
+                                                      th:classappend="${lv.leaveType == '有給(承認)' ? 'bg-success' : (lv.leaveType == '有給(却下)' ? 'bg-danger' : 'bg-warning text-dark')}"
+                                                      th:text="${lv.leaveType}">有給(申請)</span>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex gap-1" th:if="${lv.leaveType == '有給(申請)'}">
+                                                    <form action="/admin/leave/approve" method="post" class="m-0">
+                                                        <input type="hidden" name="shiftId" th:value="${lv.shiftId}">
+                                                        <input type="hidden" name="userId" th:value="${selectedUserId}">
+                                                        <input type="hidden" name="month" th:value="${selectedMonth}">
+                                                        <input type="hidden" name="startDate" th:value="${selectedStartDate}">
+                                                        <input type="hidden" name="endDate" th:value="${selectedEndDate}">
+                                                        <button type="submit" class="btn btn-success btn-sm fw-bold">承認</button>
+                                                    </form>
+                                                    <form action="/admin/leave/reject" method="post" class="m-0">
+                                                        <input type="hidden" name="shiftId" th:value="${lv.shiftId}">
+                                                        <input type="hidden" name="userId" th:value="${selectedUserId}">
+                                                        <input type="hidden" name="month" th:value="${selectedMonth}">
+                                                        <input type="hidden" name="startDate" th:value="${selectedStartDate}">
+                                                        <input type="hidden" name="endDate" th:value="${selectedEndDate}">
+                                                        <button type="submit" class="btn btn-outline-danger btn-sm fw-bold">却下</button>
+                                                    </form>
+                                                </div>
+
+                                                <form action="/admin/leave/reopen" method="post" class="m-0"
+                                                      th:if="${lv.leaveType == '有給(承認)' or lv.leaveType == '有給(却下)'}"
+                                                      onsubmit="return confirm('この有給申請を「有給(申請)」に差し戻しますか？');">
+                                                    <input type="hidden" name="shiftId" th:value="${lv.shiftId}">
+                                                    <input type="hidden" name="userId" th:value="${selectedUserId}">
+                                                    <input type="hidden" name="month" th:value="${selectedMonth}">
+                                                    <input type="hidden" name="startDate" th:value="${selectedStartDate}">
+                                                    <input type="hidden" name="endDate" th:value="${selectedEndDate}">
+                                                    <button type="submit" class="btn btn-outline-secondary btn-sm fw-bold">差し戻し</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-white border-bottom p-3">
+                            <div class="fw-bold fs-6">従業員別 有給残日数一覧</div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>ユーザーID</th>
+                                            <th>氏名</th>
+                                            <th>所属部署</th>
+                                            <th>有給残日数</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr th:each="u : ${userList}">
+                                            <td th:text="${u.userId}">1001</td>
+                                            <td class="fw-bold" th:text="${u.name}">山田 太郎</td>
+                                            <td th:text="${u.department != null ? u.department : '未設定'}">未設定</td>
+                                            <td>
+                                                <span class="badge bg-primary"
+                                                      th:text="${remainingLeaveMap != null and remainingLeaveMap[u.userId] != null ? remainingLeaveMap[u.userId] + '日' : '20日'}">20日</span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </main>
     </div>
@@ -605,7 +717,7 @@
                         <div class="mb-3">
                             <label for="editWorkPlaceInput" class="form-label fw-bold">勤務拠点</label>
                             <input type="text" name="workPlace" id="editWorkPlaceInput" class="form-control"
-                                maxlength="100" placeholder="例：福岡支店、本社">
+                                maxlength="100" placeholder="例：本社、福岡支店">
                         </div>
                         <div class="d-flex justify-content-end gap-2">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
@@ -701,6 +813,14 @@
         let temporaryShiftStorage = {};
 
         document.addEventListener('DOMContentLoaded', function () {
+            const serverActiveTab = /*[[${activeTab}]]*/ '';
+            if (serverActiveTab === 'leave' || window.location.hash === '#leave-pane') {
+                const leaveTabBtn = document.getElementById('leave-tab');
+                if (leaveTabBtn) {
+                    bootstrap.Tab.getOrCreateInstance(leaveTabBtn).show();
+                }
+            }
+
             updateShiftCalendarHeaders();
 
             const toggleRegPassword = document.getElementById('toggleRegPassword');

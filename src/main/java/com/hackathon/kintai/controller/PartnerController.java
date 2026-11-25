@@ -27,6 +27,8 @@ import java.util.stream.Collectors;
 @RequestMapping("/partner")
 public class PartnerController {
 
+    private static final int DEFAULT_PAID_LEAVE_DAYS = 20;
+
     @Autowired private AttendanceRepository attendanceRepo;
     @Autowired private UserRepository userRepo;
     @Autowired private ShiftRepository shiftRepo;
@@ -79,6 +81,20 @@ public class PartnerController {
         } catch (DateTimeParseException e) {
             return null;
         }
+    }
+
+    private boolean isPaidLeave(Shift s) {
+        if (s == null || s.getLeaveType() == null) return false;
+        return s.getLeaveType().trim().startsWith("有給");
+    }
+
+    private int calcRemainingPaidLeave(String userId) {
+        long approvedCount = shiftRepo.findAll().stream()
+                .filter(s -> userId.equals(s.getUserId())
+                        && s.getLeaveType() != null
+                        && "有給(承認)".equals(s.getLeaveType().trim()))
+                .count();
+        return Math.max(0, DEFAULT_PAID_LEAVE_DAYS - (int) approvedCount);
     }
 
     @GetMapping
@@ -176,8 +192,9 @@ public class PartnerController {
         model.addAttribute("startDate", startDate);
         model.addAttribute("endDate", endDate);
         model.addAttribute("titleLabel", titleLabel);
+        model.addAttribute("remainingPaidLeaveDays", calcRemainingPaidLeave(user.getUserId()));
 
-        // 来月分のシフト提出状況チェック（新スキーマ targetMonth / startTime / leaveType に準拠）
+        // 来月分のシフト提出状況チェック
         LocalDate today = LocalDate.now();
         if (today.getDayOfMonth() >= 25) {
             LocalDate nextMonthDate = today.plusMonths(1);
@@ -411,13 +428,18 @@ public class PartnerController {
         model.addAttribute("currentMonth", targetMonth);
 
         List<Shift> userMonthShifts = new ArrayList<>();
+        List<Shift> myPaidLeaves = new ArrayList<>();
         Map<String, String> htmlShifts = new HashMap<>();
         DateTimeFormatter hmFormatter = DateTimeFormatter.ofPattern("HH:mm");
 
         for (Shift s : shiftRepo.findAll()) {
-            if (user.getUserId().equals(s.getUserId())
-                    && s.getTargetMonth() != null
-                    && targetMonth.equals(s.getTargetMonth().trim())) {
+            if (!user.getUserId().equals(s.getUserId())) continue;
+
+            if (isPaidLeave(s)) {
+                myPaidLeaves.add(s);
+            }
+
+            if (s.getTargetMonth() != null && targetMonth.equals(s.getTargetMonth().trim())) {
                 userMonthShifts.add(s);
 
                 if (s.getStartTime() != null) {
@@ -435,6 +457,8 @@ public class PartnerController {
 
         model.addAttribute("shifts", userMonthShifts);
         model.addAttribute("dbShifts", htmlShifts);
+        model.addAttribute("myPaidLeaves", myPaidLeaves);
+        model.addAttribute("remainingPaidLeaveDays", calcRemainingPaidLeave(user.getUserId()));
 
         return "partner_shift_request";
     }
@@ -544,5 +568,54 @@ public class PartnerController {
 
         String redirectUrl = "/partner/shift/request?success=true&month=" + resolvedMonth;
         return "redirect:" + redirectUrl;
+    }
+
+    @PostMapping("/leave/apply")
+    public String applyPaidLeave(@RequestParam("leaveDate") String leaveDateStr,
+                                 HttpSession session,
+                                 RedirectAttributes ra) {
+        if (isInvalidSession(session)) return "redirect:/?error=already_logged_in";
+        User user = (User) session.getAttribute("user");
+
+        LocalDate leaveDate;
+        try {
+            leaveDate = LocalDate.parse(leaveDateStr.trim());
+        } catch (Exception e) {
+            ra.addFlashAttribute("errorMsg", "有給の対象日を正しく入力してください。");
+            return "redirect:/partner/shift/request";
+        }
+
+        String targetMonth = leaveDate.format(DateTimeFormatter.ofPattern("yyyy-MM"));
+        String periodType = resolvePeriodType(null, leaveDate.getDayOfMonth());
+
+        boolean alreadyApplied = shiftRepo.findAll().stream()
+                .anyMatch(s -> user.getUserId().equals(s.getUserId())
+                        && s.getStartTime() != null
+                        && leaveDate.equals(s.getStartTime().toLocalDate())
+                        && isPaidLeave(s)
+                        && !"有給(却下)".equals(s.getLeaveType().trim()));
+
+        if (alreadyApplied) {
+            ra.addFlashAttribute("errorMsg", leaveDate + " はすでに有給申請が登録されています。");
+            return "redirect:/partner/shift/request?month=" + targetMonth;
+        }
+
+        if (calcRemainingPaidLeave(user.getUserId()) <= 0) {
+            ra.addFlashAttribute("errorMsg", "有給の残日数がありません。");
+            return "redirect:/partner/shift/request?month=" + targetMonth;
+        }
+
+        Shift leaveShift = new Shift();
+        leaveShift.setUserId(user.getUserId());
+        leaveShift.setTargetMonth(targetMonth);
+        leaveShift.setPeriodType(periodType);
+        leaveShift.setStartTime(leaveDate.atStartOfDay());
+        leaveShift.setEndTime(leaveDate.atTime(23, 59, 59));
+        leaveShift.setLeaveType("有給(申請)");
+        leaveShift.setSubmittedAt(LocalDateTime.now());
+
+        shiftRepo.save(leaveShift);
+        ra.addFlashAttribute("success", leaveDate + " の有給を申請しました。");
+        return "redirect:/partner/shift/request?month=" + targetMonth;
     }
 }

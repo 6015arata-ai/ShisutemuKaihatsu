@@ -25,6 +25,8 @@ import java.util.Map;
 @RequestMapping("/admin")
 public class AdminController {
 
+    private static final int DEFAULT_PAID_LEAVE_DAYS = 20;
+
     @Autowired private UserRepository userRepo;
     @Autowired private AttendanceRepository attendanceRepo;
     @Autowired private ShiftRepository shiftRepo;
@@ -139,7 +141,7 @@ public class AdminController {
         model.addAttribute("selectedEndDate", endDate);
         model.addAttribute("histories", histories);
 
-        // シフトデータの取得・復元処理（新スキーマ targetMonth / startTime / endTime / leaveType に準拠）
+        // シフトデータの取得・復元処理
         List<Shift> dbShifts = shiftRepo.findAll();
         Map<String, String> savedShifts = new HashMap<>();
         DateTimeFormatter hmFormatter = DateTimeFormatter.ofPattern("HH:mm");
@@ -175,6 +177,24 @@ public class AdminController {
         model.addAttribute("shifts", dbShifts);
         model.addAttribute("savedShifts", savedShifts);
 
+        // 有給申請一覧とユーザーごとの有給残日数
+        List<Shift> paidLeaveRequests = dbShifts.stream()
+                .filter(s -> s.getLeaveType() != null && s.getLeaveType().trim().startsWith("有給"))
+                .toList();
+
+        Map<String, Integer> remainingLeaveMap = new HashMap<>();
+        for (User u : userlist) {
+            long approved = dbShifts.stream()
+                    .filter(s -> u.getUserId().equals(s.getUserId())
+                            && s.getLeaveType() != null
+                            && "有給(承認)".equals(s.getLeaveType().trim()))
+                    .count();
+            remainingLeaveMap.put(u.getUserId(), Math.max(0, DEFAULT_PAID_LEAVE_DAYS - (int) approved));
+        }
+
+        model.addAttribute("paidLeaveRequests", paidLeaveRequests);
+        model.addAttribute("remainingLeaveMap", remainingLeaveMap);
+
         return "admin_dash";
     }
 
@@ -197,7 +217,7 @@ public class AdminController {
         String branchValue = (workPlace == null || workPlace.isBlank()) ? null : workPlace.trim();
 
         if (branchValue != null && branchValue.length() > 100) {
-            redirectAttributes.addFlashAttribute("error", "【エラー】勤務拠点は100文字以内で入力してください。");
+            redirectAttributes.addFlashAttribute("error", "【エラー】所属拠点は100文字以内で入力してください。");
             keepFilters(redirectAttributes, filterUserId, filterMonth, filterStartDate, filterEndDate);
             return "redirect:/admin";
         }
@@ -252,7 +272,7 @@ public class AdminController {
                 return "redirect:/admin";
             }
             if (branchValue != null && branchValue.length() > 100) {
-                redirectAttributes.addFlashAttribute("error", "【エラー】勤務拠点は100文字以内で入力してください。");
+                redirectAttributes.addFlashAttribute("error", "【エラー】所属拠点は100文字以内で入力してください。");
                 keepFilters(redirectAttributes, filterUserId, filterMonth, filterStartDate, filterEndDate);
                 return "redirect:/admin";
             }
@@ -510,5 +530,92 @@ public class AdminController {
 
         keepFilters(redirectAttributes, userId, month, startDate, endDate);
         return "redirect:/admin";
+    }
+
+    @PostMapping("/leave/approve")
+    public String approveLeave(@RequestParam("shiftId") Long shiftId,
+                               @RequestParam(required = false) String userId,
+                               @RequestParam(required = false) String month,
+                               @RequestParam(required = false) String startDate,
+                               @RequestParam(required = false) String endDate,
+                               HttpSession session,
+                               HttpServletResponse response,
+                               RedirectAttributes redirectAttributes) {
+        if (isInvalidAdminSession(session)) return "redirect:/?error=already_logged_in";
+        setNoCacheHeaders(response);
+
+        Shift shift = shiftRepo.findById(shiftId).orElse(null);
+        if (shift == null) {
+            redirectAttributes.addFlashAttribute("error", "対象の有給申請が見つかりませんでした。");
+        } else if (!"有給(申請)".equals(shift.getLeaveType())) {
+            redirectAttributes.addFlashAttribute("error", "この有給申請はすでに処理済みです。");
+        } else {
+            shift.setLeaveType("有給(承認)");
+            shift.setSubmittedAt(LocalDateTime.now());
+            shiftRepo.save(shift);
+            redirectAttributes.addFlashAttribute("success", "有給申請（ID:" + shiftId + "）を承認しました。");
+        }
+
+        keepFilters(redirectAttributes, userId, month, startDate, endDate);
+        redirectAttributes.addFlashAttribute("activeTab", "leave");
+        return "redirect:/admin#leave-pane";
+    }
+
+    @PostMapping("/leave/reject")
+    public String rejectLeave(@RequestParam("shiftId") Long shiftId,
+                              @RequestParam(required = false) String userId,
+                              @RequestParam(required = false) String month,
+                              @RequestParam(required = false) String startDate,
+                              @RequestParam(required = false) String endDate,
+                              HttpSession session,
+                              HttpServletResponse response,
+                              RedirectAttributes redirectAttributes) {
+        if (isInvalidAdminSession(session)) return "redirect:/?error=already_logged_in";
+        setNoCacheHeaders(response);
+
+        Shift shift = shiftRepo.findById(shiftId).orElse(null);
+        if (shift == null) {
+            redirectAttributes.addFlashAttribute("error", "対象の有給申請が見つかりませんでした。");
+        } else if (!"有給(申請)".equals(shift.getLeaveType())) {
+            redirectAttributes.addFlashAttribute("error", "この有給申請はすでに処理済みです。");
+        } else {
+            shift.setLeaveType("有給(却下)");
+            shift.setSubmittedAt(LocalDateTime.now());
+            shiftRepo.save(shift);
+            redirectAttributes.addFlashAttribute("success", "有給申請（ID:" + shiftId + "）を却下しました。");
+        }
+
+        keepFilters(redirectAttributes, userId, month, startDate, endDate);
+        redirectAttributes.addFlashAttribute("activeTab", "leave");
+        return "redirect:/admin#leave-pane";
+    }
+
+    @PostMapping("/leave/reopen")
+    public String reopenLeave(@RequestParam("shiftId") Long shiftId,
+                              @RequestParam(required = false) String userId,
+                              @RequestParam(required = false) String month,
+                              @RequestParam(required = false) String startDate,
+                              @RequestParam(required = false) String endDate,
+                              HttpSession session,
+                              HttpServletResponse response,
+                              RedirectAttributes redirectAttributes) {
+        if (isInvalidAdminSession(session)) return "redirect:/?error=already_logged_in";
+        setNoCacheHeaders(response);
+
+        Shift shift = shiftRepo.findById(shiftId).orElse(null);
+        if (shift == null) {
+            redirectAttributes.addFlashAttribute("error", "対象の有給申請が見つかりませんでした。");
+        } else if (!"有給(承認)".equals(shift.getLeaveType()) && !"有給(却下)".equals(shift.getLeaveType())) {
+            redirectAttributes.addFlashAttribute("error", "差し戻しできる状態ではありません。");
+        } else {
+            shift.setLeaveType("有給(申請)");
+            shift.setSubmittedAt(LocalDateTime.now());
+            shiftRepo.save(shift);
+            redirectAttributes.addFlashAttribute("success", "有給申請（ID:" + shiftId + "）を申請中に差し戻しました。");
+        }
+
+        keepFilters(redirectAttributes, userId, month, startDate, endDate);
+        redirectAttributes.addFlashAttribute("activeTab", "leave");
+        return "redirect:/admin#leave-pane";
     }
 }
