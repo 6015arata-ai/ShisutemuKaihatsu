@@ -210,6 +210,44 @@
             </div>
         </div>
 
+        <!-- 打刻忘れ防止アラート -->
+<div th:if="${clockAlert}"
+     class="alert alert-warning d-flex align-items-center mb-4 shadow-sm border-0"
+     role="alert"
+     style="border-left: 6px solid #ffc107; background-color: #fffbea;">
+
+    <i class="bi bi-alarm-fill fs-3 text-warning me-3"></i>
+
+    <div>
+        <h5 class="alert-heading fw-bold m-0 mb-1 text-danger">
+            ⚠️ 打刻を忘れていませんか？
+        </h5>
+
+        <p class="m-0 small text-dark" th:text="${clockAlertMessage}">
+            打刻を確認してください。
+        </p>
+    </div>
+</div>
+
+<!-- 打刻忘れ防止アラート -->
+<div th:if="${clockAlert}"
+     class="alert alert-warning d-flex align-items-center mb-4 shadow-sm border-0"
+     role="alert"
+     style="border-left: 6px solid #ffc107; background-color: #fffbea;">
+
+    <i class="bi bi-alarm-fill fs-3 text-warning me-3"></i>
+
+    <div>
+        <h5 class="alert-heading fw-bold m-0 mb-1 text-danger">
+            ⚠️ 打刻を忘れていませんか？
+        </h5>
+
+        <p class="m-0 small text-dark"
+           th:text="${clockAlertMessage}">
+        </p>
+    </div>
+</div>
+
         <div th:if="${success}" class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
             <span th:text="${success}"></span>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
