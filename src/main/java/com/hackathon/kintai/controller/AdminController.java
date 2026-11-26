@@ -222,7 +222,7 @@ public class AdminController {
             return "redirect:/admin";
         }
 
-        User user = new User();
+        User user = new User();//yoshino動作確認用
         user.setName(name.trim());
         user.setPasswordHash(password); // ※後ほどハッシュ化に置換
         user.setRole(role);
