@@ -4,149 +4,146 @@
     <meta charset="UTF-8">
     <title>パートナー画面 | K-PRO</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     
-   <style>
-    /* 1. 共通設定・リセット */
-    body {
-        background-color: #f8f9fa;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        color: #333;
-        margin: 0;
-        overflow-x: hidden;
-    }
+    <style>
+        /* 1. 共通設定・リセット */
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #333;
+            margin: 0;
+            overflow-x: hidden;
+        }
 
-    /* 2. 管理画面レイアウト（PC） */
-    .admin-layout {
-        display: grid;
-        grid-template-columns: 320px 1fr;
-        min-height: 100vh;
-        width: 100vw;
-    }
+        /* 2. 管理画面レイアウト（PC） */
+        .admin-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            min-height: 100vh;
+            width: 100vw;
+        }
 
-@media (max-width: 991px) {
-    /* 1. ナビゲーションの親要素を強制中央寄せ */
-    .navbar-collapse {
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: center !important;
-        align-items: center !important;
-        width: 100% !important;
-    }
+        @media (max-width: 991px) {
+            /* 1. ナビゲーションの親要素を強制中央寄せ */
+            .navbar-collapse {
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: center !important;
+                align-items: center !important;
+                width: 100% !important;
+            }
 
-    /* 2. ナビゲーションリストを中央に配置 */
-    .navbar-nav {
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-        justify-content: center !important;
-        margin: 0 auto !important;
-        width: 100% !important;
-        float: none !important;
-    }
+            /* 2. ナビゲーションリストを中央に配置 */
+            .navbar-nav {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                margin: 0 auto !important;
+                width: 100% !important;
+                float: none !important;
+            }
 
-    /* 3. 中身の要素（アイテム・ボタン）を中央寄せ */
-    .navbar-nav .nav-item, 
-    .navbar-nav .nav-link,
-    .navbar-nav .btn {
-        width: 80% !important;
-        max-width: 300px !important;
-        margin: 5px auto !important;
-        text-align: center !important;
-        display: flex !important;
-        justify-content: center !important;
-    }
+            /* 3. 中身の要素（アイテム・ボタン）を中央寄せ */
+            .navbar-nav .nav-item, 
+            .navbar-nav .nav-link,
+            .navbar-nav .btn {
+                width: 80% !important;
+                max-width: 300px !important;
+                margin: 5px auto !important;
+                text-align: center !important;
+                display: flex !important;
+                justify-content: center !important;
+            }
 
-    /* 4. ドロップダウンの挙動を固定 */
-    .navbar-nav .dropdown,
-    .navbar-nav .dropdown-menu {
-        width: 80% !important;
-        margin: 5px auto !important;
-        position: static !important;
-        float: none !important;
-    }
-}
-    
-    /* 5. 念のための強制リセット */
-    .navbar-nav.mx-auto {
-        margin-left: auto !important;
-        margin-right: auto !important;
-    }
-    
-    /* 5. 余白リセット */
-    .navbar-nav.ms-auto {
-        margin-left: auto !important;
-        margin-right: auto !important;
-        gap: 0 !important;
-    }
-    
-    /* サイドバーを非表示（none）から「表示」に変更 */
-    .admin-sidebar {
-        display: flex !important; /* 確実に表示する */
-        width: 100% !important;
-        height: auto !important;
-        min-height: auto !important;
-        border-right: none !important;
-        border-bottom: 1px solid #eaeaea;
-        position: relative !important;
-        top: 0 !important;
-        overflow-y: visible !important;
-    }
+            /* 4. ドロップダウンの挙動を固定 */
+            .navbar-nav .dropdown,
+            .navbar-nav .dropdown-menu {
+                width: 80% !important;
+                margin: 5px auto !important;
+                position: static !important;
+                float: none !important;
+            }
+        }
+        
+        /* 5. 念のための強制リセット */
+        .navbar-nav.mx-auto {
+            margin-left: auto !important;
+            margin-right: auto !important;
+        }
+        
+        .navbar-nav.ms-auto {
+            margin-left: auto !important;
+            margin-right: auto !important;
+            gap: 0 !important;
+        }
+        
+        /* サイドバー表示設定 */
+        .admin-sidebar {
+            display: flex !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: auto !important;
+            border-right: none !important;
+            border-bottom: 1px solid #eaeaea;
+            position: relative !important;
+            top: 0 !important;
+            overflow-y: visible !important;
+        }
 
-    /* 内部のメニューをスマホで見やすく整える */
-    .sidebar-menu, .sidebar-footer {
-        display: block !important;
-        width: 100% !important;
-    }
-    
-    .admin-main-content {
-        padding: 15px !important;
-        width: 100% !important;
-    }
+        .sidebar-menu, .sidebar-footer {
+            display: block !important;
+            width: 100% !important;
+        }
+        
+        .admin-main-content {
+            padding: 15px !important;
+            width: 100% !important;
+        }
 
-    /* 4. ヘッダー・ボタンパーツ */
-    .btn-nav-custom {
-        border: 1px solid rgba(255, 255, 255, 0.6);
-        color: white !important;
-        transition: all 0.3s;
-    }
-    .btn-nav-custom:hover, .btn-nav-custom:focus, .show > .btn-nav-custom {
-        background-color: white !important;
-        color: #6c757d !important;
-        border-color: white;
-    }
+        /* 4. ヘッダー・ボタンパーツ */
+        .btn-nav-custom {
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            color: white !important;
+            transition: all 0.3s;
+        }
+        .btn-nav-custom:hover, .btn-nav-custom:focus, .show > .btn-nav-custom {
+            background-color: white !important;
+            color: #6c757d !important;
+            border-color: white;
+        }
 
-    /* 5. 検索・入力フォーム系 */
-    .search-container { background-color: #fff; border-radius: 8px; }
-    #rangePicker { min-width: 280px; background-color: #fff !important; cursor: pointer; }
+        /* 5. 検索・入力フォーム系 */
+        .search-container { background-color: #fff; border-radius: 8px; }
+        #rangePicker { min-width: 280px; background-color: #fff !important; cursor: pointer; }
 
-    /* 6. パスワードトグル */
-    .password-toggle-btn {
-        border: 1px solid #ddd;
-        border-left: none;
-        background: #fff;
-        color: #888;
-        border-radius: 0 8px 8px 0;
-        padding: 0 12px;
-        display: flex;
-        align-items: center;
-        transition: all 0.2s;
-    }
-    .form-control-password { border-radius: 8px 0 0 8px !important; }
+        /* 6. パスワードトグル */
+        .password-toggle-btn {
+            border: 1px solid #ddd;
+            border-left: none;
+            background: #fff;
+            color: #888;
+            border-radius: 0 8px 8px 0;
+            padding: 0 12px;
+            display: flex;
+            align-items: center;
+            transition: all 0.2s;
+        }
+        .form-control-password { border-radius: 8px 0 0 8px !important; }
 
-    /* 7. ナビゲーションタブ */
-    .nav-tabs .nav-link { color: #495057; font-weight: 600; }
-    .nav-tabs .nav-link.active {
-        color: #000 !important;
-        font-weight: 700;
-        border-bottom: 3px solid #6c757d;
-    }
+        /* 7. ナビゲーションタブ */
+        .nav-tabs .nav-link { color: #495057; font-weight: 600; }
+        .nav-tabs .nav-link.active {
+            color: #000 !important;
+            font-weight: 700;
+            border-bottom: 3px solid #6c757d;
+        }
 
-    /* 8. その他 */
-    #live-clock { font-family: 'Courier New', monospace; }
-</style>
+        /* 8. その他 */
+        #live-clock { font-family: 'Courier New', monospace; }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
@@ -199,6 +196,7 @@
             </li>
         </ul>
 
+        <!-- 来月分シフト未提出アラート -->
         <div th:if="${showShiftAlert}" class="alert alert-danger d-flex align-items-center mb-4 shadow-sm border-0" role="alert" style="border-left: 6px solid #dc3545; background-color: #fff5f5;">
             <i class="bi bi-exclamation-triangle-fill fs-3 text-danger me-3"></i>
             <div>
@@ -211,49 +209,27 @@
         </div>
 
         <!-- 打刻忘れ防止アラート -->
-<div th:if="${clockAlert}"
-     class="alert alert-warning d-flex align-items-center mb-4 shadow-sm border-0"
-     role="alert"
-     style="border-left: 6px solid #ffc107; background-color: #fffbea;">
-
-    <i class="bi bi-alarm-fill fs-3 text-warning me-3"></i>
-
-    <div>
-        <h5 class="alert-heading fw-bold m-0 mb-1 text-danger">
-            ⚠️ 打刻を忘れていませんか？
-        </h5>
-
-        <p class="m-0 small text-dark" th:text="${clockAlertMessage}">
-            打刻を確認してください。
-        </p>
-    </div>
-</div>
-
-<!-- 打刻忘れ防止アラート -->
-<div th:if="${clockAlert}"
-     class="alert alert-warning d-flex align-items-center mb-4 shadow-sm border-0"
-     role="alert"
-     style="border-left: 6px solid #ffc107; background-color: #fffbea;">
-
-    <i class="bi bi-alarm-fill fs-3 text-warning me-3"></i>
-
-    <div>
-        <h5 class="alert-heading fw-bold m-0 mb-1 text-danger">
-            ⚠️ 打刻を忘れていませんか？
-        </h5>
-
-        <p class="m-0 small text-dark"
-           th:text="${clockAlertMessage}">
-        </p>
-    </div>
-</div>
+        <div th:if="${clockAlert}"
+             class="alert alert-warning d-flex align-items-center mb-4 shadow-sm border-0"
+             role="alert"
+             style="border-left: 6px solid #ffc107; background-color: #fffbea;">
+            <i class="bi bi-alarm-fill fs-3 text-warning me-3"></i>
+            <div>
+                <h5 class="alert-heading fw-bold m-0 mb-1 text-danger">
+                    ⚠️ 打刻を忘れていませんか？
+                </h5>
+                <p class="m-0 small text-dark" th:text="${clockAlertMessage}">
+                    打刻を確認してください。
+                </p>
+            </div>
+        </div>
 
         <div th:if="${success}" class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
             <span th:text="${success}"></span>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
 
-        <!-- 🔔 Controllerのバリデーションエラーメッセージを表示するエリア -->
+        <!-- Controllerのバリデーションエラーメッセージ -->
         <div th:if="${errorMsg}" class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
             <span th:text="${errorMsg}"></span>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -267,11 +243,17 @@
         </div>
 
         <div class="card p-4 shadow-sm text-center mb-4 border-0">
-            <h2 class="mb-2 fw-bold text-dark">打刻パネル</h2>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="badge bg-info text-dark">
+                    有給残日数：<span th:text="${remainingPaidLeaveDays != null ? remainingPaidLeaveDays : 20}">20</span> 日
+                </span>
+                <h2 class="m-0 fw-bold text-dark">打刻パネル</h2>
+                <span style="width: 110px;"></span>
+            </div>
             <div class="h3 text-primary fw-bold mb-4" id="live-clock">00:00:00</div>
             <div class="d-flex justify-content-center gap-3 flex-wrap">
                 
-                <!-- 🆕 出勤フォーム（勤務場所付き） -->
+                <!-- 出勤フォーム（勤務場所付き） -->
                 <form action="/partner/attendance/clock" method="post" onsubmit="return singleSubmit(this)" class="border p-3 rounded bg-white shadow-sm" th:if="${status == 'OFF'}">
                     <input type="hidden" name="type" value="0">
                     <div class="mb-3 text-start">
@@ -280,20 +262,19 @@
                     </div>
                     <button type="submit" class="btn btn-primary btn-lg px-5 shadow-sm fw-bold w-100">出勤</button>
                 </form>
-                <!-- 出勤済みの場合はグレーのボタンだけ表示 -->
                 <button th:if="${status != 'OFF'}" type="button" class="btn btn-secondary btn-lg px-5 opacity-50 fw-bold" disabled>出勤</button>
 
-                <!-- 休憩入りフォーム（そのまま） -->
+                <!-- 休憩入りフォーム -->
                 <form action="/partner/break-start" method="post" onsubmit="return singleSubmit(this)">
                     <button type="submit" class="btn btn-lg px-4 shadow-sm fw-bold text-white h-100" th:classappend="${status == 'WORK' ? 'btn-warning' : 'btn-secondary opacity-50'}" th:disabled="${status != 'WORK'}">休憩入り</button>
                 </form>
 
-                <!-- 休憩戻りフォーム（そのまま） -->
+                <!-- 休憩戻りフォーム -->
                 <form action="/partner/break-end" method="post" onsubmit="return singleSubmit(this)">
                     <button type="submit" class="btn btn-lg px-4 shadow-sm fw-bold h-100" th:classappend="${status == 'REST' ? 'btn-success' : 'btn-secondary opacity-50'}" th:disabled="${status != 'REST'}">休憩戻り</button>
                 </form>
 
-                <!-- 🆕 退勤フォーム（残業理由付き） -->
+                <!-- 退勤フォーム（残業理由付き） -->
                 <form action="/partner/attendance/clock" method="post" onsubmit="return singleSubmit(this)" class="border p-3 rounded bg-white shadow-sm" th:if="${status == 'WORK'}">
                     <input type="hidden" name="type" value="1">
                     <div class="mb-3 text-start">
@@ -302,7 +283,6 @@
                     </div>
                     <button type="submit" class="btn btn-danger btn-lg px-5 shadow-sm fw-bold w-100">退勤</button>
                 </form>
-                <!-- 勤務中以外はグレーのボタンだけ表示 -->
                 <button th:if="${status != 'WORK'}" type="button" class="btn btn-secondary btn-lg px-5 opacity-50 fw-bold" disabled>退勤</button>
 
             </div>
@@ -326,20 +306,17 @@
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
-                        <!-- 🆕 勤務場所と残業理由の列を追加 -->
                         <tr><th>日付</th><th>勤務場所</th><th>出勤</th><th>退勤</th><th>休憩開始</th><th>休憩終了</th><th>実働時間</th><th>残業理由</th></tr>
                     </thead>
                     <tbody>
                         <tr th:each="h : ${myHistories}">
                             <td th:text="${#temporals.format(h.startTime, 'yyyy/MM/dd')}"></td>
-                            <!-- 🆕 勤務場所を表示 -->
                             <td th:text="${h.workPlace != null ? h.workPlace : '-'}"></td>
                             <td th:text="${#temporals.format(h.startTime, 'HH:mm')}" class="fw-bold"></td>
                             <td th:text="${h.endTime != null ? #temporals.format(h.endTime, 'HH:mm') : '-'}"></td>
                             <td th:text="${h.breakStartTime != null ? #temporals.format(h.breakStartTime, 'HH:mm') : '-'}"></td>
                             <td th:text="${h.breakEndTime != null ? #temporals.format(h.breakEndTime, 'HH:mm') : '-'}"></td>
                             <td class="fw-bold text-success" th:text="${h.workTime}"></td>
-                            <!-- 🆕 残業理由を表示（長すぎたら省略表示にする小技） -->
                             <td th:text="${h.overtimeReason != null ? h.overtimeReason : '-'}" class="text-truncate" style="max-width: 150px;" th:title="${h.overtimeReason}"></td>
                         </tr>
                         <tr th:if="${#lists.isEmpty(myHistories)}">
@@ -383,7 +360,7 @@
         </div>
     </div>
 
-    <!-- パスワード変更モーダル (変更なし) -->
+    <!-- パスワード変更モーダル -->
     <div class="modal fade" id="pwModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content border-0 shadow">
@@ -408,3 +385,77 @@
                                 <input type="password" name="confirmPassword" id="confirmPassword" class="form-control form-control-password" required minlength="4" placeholder="Confirm password">
                                 <button class="btn password-toggle-btn" type="button" id="toggleConfirmPassword">
                                     <i class="bi bi-eye-slash" id="eyeIconConfirm"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                        <button type="submit" class="btn btn-sm btn-primary px-3">更新</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        function updateClock() {
+            const now = new Date();
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+            const clockEl = document.getElementById('live-clock');
+            if (clockEl) {
+                clockEl.textContent = `${h}:${m}:${s}`;
+            }
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        function singleSubmit(form) {
+            const btn = form.querySelector('button[type="submit"]');
+            if (btn) {
+                if (btn.disabled) return false;
+                btn.disabled = true;
+            }
+            return true;
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const startVal = /*[[${startDate}]]*/ '';
+            const endVal = /*[[${endDate}]]*/ '';
+            const defaultDates = (startVal && endVal) ? [startVal, endVal] : [];
+
+            flatpickr('#rangePicker', {
+                mode: 'range',
+                locale: 'ja',
+                dateFormat: 'Y-m-d',
+                defaultDate: defaultDates,
+                onClose: function (selectedDates, dateStr, instance) {
+                    if (selectedDates.length === 2) {
+                        const fmt = (d) => instance.formatDate(d, 'Y-m-d');
+                        document.getElementById('startDate').value = fmt(selectedDates[0]);
+                        document.getElementById('endDate').value = fmt(selectedDates[1]);
+                        document.getElementById('searchForm').submit();
+                    }
+                }
+            });
+
+            function bindToggle(btnId, inputId, iconId) {
+                const btn = document.getElementById(btnId);
+                const input = document.getElementById(inputId);
+                const icon = document.getElementById(iconId);
+                if (btn && input && icon) {
+                    btn.addEventListener('click', function () {
+                        const isPw = input.type === 'password';
+                        input.type = isPw ? 'text' : 'password';
+                        icon.className = isPw ? 'bi bi-eye' : 'bi bi-eye-slash';
+                    });
+                }
+            }
+            bindToggle('toggleNewPassword', 'newPassword', 'eyeIconNew');
+            bindToggle('toggleConfirmPassword', 'confirmPassword', 'eyeIconConfirm');
+        });
+    </script>
+</body>
+</html>
