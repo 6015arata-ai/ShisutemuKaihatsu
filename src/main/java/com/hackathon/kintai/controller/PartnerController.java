@@ -499,6 +499,20 @@ public class PartnerController {
             if (s.getTargetMonth() != null && targetMonth.equals(s.getTargetMonth().trim())) {
                 userMonthShifts.add(s);
 
+                boolean isDayOff = s.getLeaveType() != null && "休み".equals(s.getLeaveType().trim());
+                if (isDayOff) {
+                    LocalDate dayOffDate = (s.getStartTime() != null)
+                            ? s.getStartTime().toLocalDate()
+                            : (s.getEndTime() != null ? s.getEndTime().toLocalDate()
+                            : (s.getSubmittedAt() != null ? s.getSubmittedAt().toLocalDate() : null));
+                    if (dayOffDate != null && targetMonth.equals(dayOffDate.format(DateTimeFormatter.ofPattern("yyyy-MM")))) {
+                        int day = dayOffDate.getDayOfMonth();
+                        htmlShifts.put("shift_in_" + user.getUserId() + "_" + targetMonth + "_" + day, "休み");
+                        htmlShifts.put("shift_out_" + user.getUserId() + "_" + targetMonth + "_" + day, "休み");
+                    }
+                    continue;
+                }
+
                 if (s.getStartTime() != null) {
                     int day = s.getStartTime().getDayOfMonth();
                     String key = "shift_in_" + user.getUserId() + "_" + targetMonth + "_" + day;
@@ -538,7 +552,9 @@ public class PartnerController {
         );
         String resolvedLeave = trimOrNull(leaveTypeParam);
 
+        LocalDate today = LocalDate.now();
         boolean savedAny = false;
+        boolean skippedPastDate = false;
         LocalDateTime now = LocalDateTime.now();
 
         // 日別フォーム（shift_in_<userId>_<YYYY-MM>_<day> 形式）で送信された場合の処理
@@ -579,8 +595,19 @@ public class PartnerController {
                 int safeDay = Math.max(1, Math.min(day, ym.lengthOfMonth()));
                 LocalDate baseDate = ym.atDay(safeDay);
 
-                LocalDateTime startDt = parseTimeToDateTime(val, baseDate);
-                LocalDateTime endDt = parseTimeToDateTime(endVal, baseDate);
+                // 今日より前の日付は保存せずスキップ
+                if (baseDate.isBefore(today)) {
+                    skippedPastDate = true;
+                    continue;
+                }
+
+                boolean isDayOff = "休み".equals(val) || "休み".equals(endVal);
+                LocalDateTime startDt = isDayOff ? baseDate.atStartOfDay() : parseTimeToDateTime(val, baseDate);
+                LocalDateTime endDt = null;
+                if (!isDayOff) {
+                    endDt = parseTimeToDateTime(endVal, baseDate);
+                }
+                String rowLeaveType = isDayOff ? "休み" : resolvedLeave;
 
                 Shift shift = new Shift();
                 shift.setUserId(targetUserId);
@@ -588,7 +615,7 @@ public class PartnerController {
                 shift.setPeriodType(resolvePeriodType(periodType, safeDay));
                 shift.setStartTime(startDt);
                 shift.setEndTime(endDt);
-                shift.setLeaveType(resolvedLeave);
+                shift.setLeaveType(rowLeaveType);
                 shift.setSubmittedAt(now);
 
                 shiftRepo.save(shift);
@@ -599,19 +626,29 @@ public class PartnerController {
         // 単一フォーム（targetMonth, startTime, endTime, leaveType, periodType）で送信された場合の処理
         if (!savedAny) {
             YearMonth ym = YearMonth.parse(resolvedMonth);
-            int fallbackDay = Math.min(LocalDate.now().getDayOfMonth(), ym.lengthOfMonth());
+            int fallbackDay = Math.min(today.getDayOfMonth(), ym.lengthOfMonth());
             LocalDate baseDate = ym.atDay(fallbackDay);
-            LocalDateTime startDt = parseTimeToDateTime(startTimeParam, baseDate);
-            LocalDateTime endDt = parseTimeToDateTime(endTimeParam, baseDate);
+            boolean isDayOff = "休み".equals(startTimeParam) || "休み".equals(endTimeParam) || "休み".equals(resolvedLeave);
+            LocalDateTime startDt = isDayOff ? baseDate.atStartOfDay() : parseTimeToDateTime(startTimeParam, baseDate);
+            LocalDateTime endDt = null;
+            if (!isDayOff) {
+                endDt = parseTimeToDateTime(endTimeParam, baseDate);
+            }
+            String rowLeaveType = isDayOff ? "休み" : resolvedLeave;
 
-            if (startDt != null || endDt != null || resolvedLeave != null) {
+            if (startDt != null || endDt != null || rowLeaveType != null) {
+                if (baseDate.isBefore(today)) {
+                    ra.addFlashAttribute("errorMsg", "過去の日付のシフトは申請できません。");
+                    return "redirect:/partner/shift/request?month=" + resolvedMonth;
+                }
+
                 Shift shift = new Shift();
                 shift.setUserId(user.getUserId());
                 shift.setTargetMonth(resolvedMonth);
                 shift.setPeriodType(resolvePeriodType(periodType, fallbackDay));
                 shift.setStartTime(startDt);
                 shift.setEndTime(endDt);
-                shift.setLeaveType(resolvedLeave);
+                shift.setLeaveType(rowLeaveType);
                 shift.setSubmittedAt(now);
 
                 shiftRepo.save(shift);
@@ -619,6 +656,13 @@ public class PartnerController {
             }
         }
 
+        if (skippedPastDate && !savedAny) {
+            ra.addFlashAttribute("errorMsg", "過去の日付のシフトは申請できません。");
+            return "redirect:/partner/shift/request?month=" + resolvedMonth;
+        }
+        if (skippedPastDate) {
+            ra.addFlashAttribute("errorMsg", "過去の日付は除外し、本日以降のデータのみ保存しました。");
+        }
         if (!savedAny) {
             ra.addFlashAttribute("errorMsg", "入力内容が空のため保存されませんでした。");
         }
@@ -640,6 +684,12 @@ public class PartnerController {
         } catch (Exception e) {
             ra.addFlashAttribute("errorMsg", "有給の対象日を正しく入力してください。");
             return "redirect:/partner/shift/request";
+        }
+
+        if (leaveDate.isBefore(LocalDate.now())) {
+            String targetMonth = leaveDate.format(DateTimeFormatter.ofPattern("yyyy-MM"));
+            ra.addFlashAttribute("errorMsg", "過去の日付の有給は申請できません。");
+            return "redirect:/partner/shift/request?month=" + targetMonth;
         }
 
         String targetMonth = leaveDate.format(DateTimeFormatter.ofPattern("yyyy-MM"));

@@ -164,6 +164,20 @@ public class AdminController {
                     savedShifts.put("shift_minus_" + currentUid + "_" + ymStr + "_" + day, minusVal);
                 }
             } else {
+                boolean isDayOff = s.getLeaveType() != null && "休み".equals(s.getLeaveType().trim());
+                if (isDayOff) {
+                    LocalDate dayOffDate = (s.getStartTime() != null)
+                            ? s.getStartTime().toLocalDate()
+                            : (s.getEndTime() != null ? s.getEndTime().toLocalDate()
+                            : (s.getSubmittedAt() != null ? s.getSubmittedAt().toLocalDate() : null));
+                    if (dayOffDate != null && ymStr.equals(dayOffDate.format(DateTimeFormatter.ofPattern("yyyy-MM")))) {
+                        int day = dayOffDate.getDayOfMonth();
+                        savedShifts.put("shift_in_" + currentUid + "_" + ymStr + "_" + day, "休み");
+                        savedShifts.put("shift_out_" + currentUid + "_" + ymStr + "_" + day, "休み");
+                    }
+                    continue;
+                }
+
                 if (s.getStartTime() != null) {
                     int day = s.getStartTime().getDayOfMonth();
                     savedShifts.put("shift_in_" + currentUid + "_" + ymStr + "_" + day, s.getStartTime().format(hmFormatter));

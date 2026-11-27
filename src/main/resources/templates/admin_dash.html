@@ -619,66 +619,32 @@
                                                       th:text="${lv.leaveType}">有給(申請)</span>
                                             </td>
                                             <td>
-                                                <div class="d-flex gap-1" th:if="${lv.leaveType == '有給(申請)'}">
-                                                    <form action="/admin/leave/approve" method="post" class="m-0">
+                                                <div class="d-flex gap-1">
+                                                    <form th:if="${lv.leaveType == '有給(申請)'}" action="/admin/leave/approve" method="post" class="m-0">
                                                         <input type="hidden" name="shiftId" th:value="${lv.shiftId}">
                                                         <input type="hidden" name="userId" th:value="${selectedUserId}">
                                                         <input type="hidden" name="month" th:value="${selectedMonth}">
                                                         <input type="hidden" name="startDate" th:value="${selectedStartDate}">
                                                         <input type="hidden" name="endDate" th:value="${selectedEndDate}">
-                                                        <button type="submit" class="btn btn-success btn-sm fw-bold">承認</button>
+                                                        <button type="submit" class="btn btn-success btn-sm">承認</button>
                                                     </form>
-                                                    <form action="/admin/leave/reject" method="post" class="m-0">
+                                                    <form th:if="${lv.leaveType == '有給(申請)'}" action="/admin/leave/reject" method="post" class="m-0">
                                                         <input type="hidden" name="shiftId" th:value="${lv.shiftId}">
                                                         <input type="hidden" name="userId" th:value="${selectedUserId}">
                                                         <input type="hidden" name="month" th:value="${selectedMonth}">
                                                         <input type="hidden" name="startDate" th:value="${selectedStartDate}">
                                                         <input type="hidden" name="endDate" th:value="${selectedEndDate}">
-                                                        <button type="submit" class="btn btn-outline-danger btn-sm fw-bold">却下</button>
+                                                        <button type="submit" class="btn btn-danger btn-sm">却下</button>
+                                                    </form>
+                                                    <form th:if="${lv.leaveType == '有給(承認)' or lv.leaveType == '有給(却下)'}" action="/admin/leave/reopen" method="post" class="m-0">
+                                                        <input type="hidden" name="shiftId" th:value="${lv.shiftId}">
+                                                        <input type="hidden" name="userId" th:value="${selectedUserId}">
+                                                        <input type="hidden" name="month" th:value="${selectedMonth}">
+                                                        <input type="hidden" name="startDate" th:value="${selectedStartDate}">
+                                                        <input type="hidden" name="endDate" th:value="${selectedEndDate}">
+                                                        <button type="submit" class="btn btn-outline-secondary btn-sm">差し戻し</button>
                                                     </form>
                                                 </div>
-
-                                                <form action="/admin/leave/reopen" method="post" class="m-0"
-                                                      th:if="${lv.leaveType == '有給(承認)' or lv.leaveType == '有給(却下)'}"
-                                                      onsubmit="return confirm('この有給申請を「有給(申請)」に差し戻しますか？');">
-                                                    <input type="hidden" name="shiftId" th:value="${lv.shiftId}">
-                                                    <input type="hidden" name="userId" th:value="${selectedUserId}">
-                                                    <input type="hidden" name="month" th:value="${selectedMonth}">
-                                                    <input type="hidden" name="startDate" th:value="${selectedStartDate}">
-                                                    <input type="hidden" name="endDate" th:value="${selectedEndDate}">
-                                                    <button type="submit" class="btn btn-outline-secondary btn-sm fw-bold">差し戻し</button>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card shadow-sm border-0">
-                        <div class="card-header bg-white border-bottom p-3">
-                            <div class="fw-bold fs-6">従業員別 有給残日数一覧</div>
-                        </div>
-                        <div class="card-body p-0">
-                            <div class="table-responsive">
-                                <table class="table table-sm table-bordered align-middle mb-0">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>ユーザーID</th>
-                                            <th>氏名</th>
-                                            <th>所属部署</th>
-                                            <th>有給残日数</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr th:each="u : ${userList}">
-                                            <td th:text="${u.userId}">1001</td>
-                                            <td class="fw-bold" th:text="${u.name}">山田 太郎</td>
-                                            <td th:text="${u.department != null ? u.department : '未設定'}">未設定</td>
-                                            <td>
-                                                <span class="badge bg-primary"
-                                                      th:text="${remainingLeaveMap != null and remainingLeaveMap[u.userId] != null ? remainingLeaveMap[u.userId] + '日' : '20日'}">20日</span>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -692,115 +658,105 @@
         </main>
     </div>
 
-    <!-- 所属部署・勤務拠点編集モーダル -->
-    <div class="modal fade" id="departmentModal" tabindex="-1">
+    <!-- 新規打刻登録モーダル -->
+    <div class="modal fade" id="createAttendanceModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">所属部署・勤務拠点の変更</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="mb-3">対象ユーザー: <strong id="deptTargetName"></strong></p>
-                    <form action="/admin/update-department" method="post">
-                        <input type="hidden" name="filterUserId" th:value="${selectedUserId}">
-                        <input type="hidden" name="filterMonth" th:value="${selectedMonth}">
-                        <input type="hidden" name="filterStartDate" th:value="${selectedStartDate}">
-                        <input type="hidden" name="filterEndDate" th:value="${selectedEndDate}">
-                        <input type="hidden" name="targetId" id="deptTargetId">
-
+                <form action="/admin/create-attendance" method="post">
+                    <input type="hidden" name="filterUserId" th:value="${selectedUserId}">
+                    <input type="hidden" name="filterMonth" th:value="${selectedMonth}">
+                    <input type="hidden" name="filterStartDate" th:value="${selectedStartDate}">
+                    <input type="hidden" name="filterEndDate" th:value="${selectedEndDate}">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold">新規打刻登録</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
                         <div class="mb-3">
-                            <label for="editDepartmentInput" class="form-label fw-bold">所属部署</label>
-                            <input type="text" name="department" id="editDepartmentInput" class="form-control"
-                                maxlength="50" placeholder="例：開発部、営業部">
-                        </div>
-                        <div class="mb-3">
-                            <label for="editWorkPlaceInput" class="form-label fw-bold">勤務拠点</label>
-                            <input type="text" name="workPlace" id="editWorkPlaceInput" class="form-control"
-                                maxlength="100" placeholder="例：本社、福岡支店">
-                        </div>
-                        <div class="d-flex justify-content-end gap-2">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                            <button type="submit" class="btn btn-primary fw-bold">保存する</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal fade" id="createAttendanceModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title">新規打刻の登録</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form action="/admin/create-attendance" method="post">
-                        <input type="hidden" name="filterUserId" th:value="${selectedUserId}">
-                        <input type="hidden" name="filterMonth" th:value="${selectedMonth}">
-                        <input type="hidden" name="filterStartDate" th:value="${selectedStartDate}">
-                        <input type="hidden" name="filterEndDate" th:value="${selectedEndDate}">
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">対象ユーザー</label>
-                            <select name="targetUserId" class="form-select" required>
-                                <option value="" disabled selected>選択してください</option>
+                            <label class="form-label small fw-bold">対象従業員</label>
+                            <select name="targetUserId" class="form-select form-select-sm" required>
                                 <option th:each="u : ${userList}" th:value="${u.userId}"
                                     th:text="${u.name} + ' (' + ${u.userId} + ')'"></option>
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-bold">出勤時間</label>
-                            <input type="datetime-local" name="startTime" class="form-control" required>
+                            <label class="form-label small fw-bold">出勤日時</label>
+                            <input type="datetime-local" name="startTime" class="form-control form-control-sm" required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-bold">退勤時間</label>
-                            <input type="datetime-local" name="endTime" class="form-control">
+                            <label class="form-label small fw-bold">退勤日時</label>
+                            <input type="datetime-local" name="endTime" class="form-control form-control-sm">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-bold">休憩時間（分）</label>
-                            <input type="number" name="breakMinutes" class="form-control" value="0" min="0">
+                            <label class="form-label small fw-bold">休憩時間（分）</label>
+                            <input type="number" name="breakMinutes" class="form-control form-control-sm" value="0" min="0">
                         </div>
-                        <div class="d-flex justify-content-end gap-2">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                            <button type="submit" class="btn btn-success fw-bold">登録する</button>
-                        </div>
-                    </form>
-                </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">キャンセル</button>
+                        <button type="submit" class="btn btn-success btn-sm fw-bold">登録</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 
-    <div class="modal fade" id="deleteModal" tabindex="-1">
+    <!-- 所属編集モーダル -->
+    <div class="modal fade" id="departmentModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title">ユーザー削除の確認</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p>本当にユーザー <strong id="deleteTargetName"></strong> を削除しますか？<br>
-                        <span class="text-danger small">※このユーザーの勤怠データもすべて削除されます。</span>
-                    </p>
-
-                    <form action="/admin/delete-user" method="post">
-                        <input type="hidden" name="filterUserId" th:value="${selectedUserId}">
-                        <input type="hidden" name="filterMonth" th:value="${selectedMonth}">
-                        <input type="hidden" name="filterStartDate" th:value="${selectedStartDate}">
-                        <input type="hidden" name="filterEndDate" th:value="${selectedEndDate}">
-                        <input type="hidden" name="targetId" id="deleteTargetId">
+                <form action="/admin/update-department" method="post">
+                    <input type="hidden" name="filterUserId" th:value="${selectedUserId}">
+                    <input type="hidden" name="filterMonth" th:value="${selectedMonth}">
+                    <input type="hidden" name="filterStartDate" th:value="${selectedStartDate}">
+                    <input type="hidden" name="filterEndDate" th:value="${selectedEndDate}">
+                    <input type="hidden" name="targetId" id="deptTargetId">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold">所属情報編集（<span id="deptTargetName"></span>）</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label fw-bold">管理者のパスワードを入力</label>
-                            <input type="password" name="adminPassword" class="form-control" required>
+                            <label class="form-label small fw-bold">所属部署</label>
+                            <input type="text" name="department" id="editDepartmentInput" class="form-control form-control-sm" maxlength="50">
                         </div>
-                        <div class="d-flex justify-content-end gap-2">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                            <button type="submit" class="btn btn-danger">削除実行</button>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">勤務拠点</label>
+                            <input type="text" name="workPlace" id="editWorkPlaceInput" class="form-control form-control-sm" maxlength="100">
                         </div>
-                    </form>
-                </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">キャンセル</button>
+                        <button type="submit" class="btn btn-primary btn-sm fw-bold">更新</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 従業員削除モーダル -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form action="/admin/delete-user" method="post">
+                    <input type="hidden" name="filterUserId" th:value="${selectedUserId}">
+                    <input type="hidden" name="filterMonth" th:value="${selectedMonth}">
+                    <input type="hidden" name="filterStartDate" th:value="${selectedStartDate}">
+                    <input type="hidden" name="filterEndDate" th:value="${selectedEndDate}">
+                    <input type="hidden" name="targetId" id="deleteTargetId">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold text-danger">従業員削除</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="small mb-3"><strong id="deleteTargetName"></strong> さんと、関連するシフト・勤怠データを削除します。管理者パスワードを入力してください。</p>
+                        <input type="password" name="adminPassword" class="form-control form-control-sm" placeholder="管理者パスワード" required>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">キャンセル</button>
+                        <button type="submit" class="btn btn-danger btn-sm fw-bold">削除する</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -983,9 +939,10 @@
                         ? `shift_minus_minus_${monthInput.value}_${d}`
                         : `shift_${type}_${uid}_${monthInput.value}_${d}`;
 
+                    const rawDbVal = dbShifts ? dbShifts[inputName] : '';
                     const savedVal = (inputName in temporaryShiftStorage)
                         ? temporaryShiftStorage[inputName]
-                        : (dbShifts && dbShifts[inputName] ? dbShifts[inputName] : '');
+                        : (rawDbVal != null ? String(rawDbVal) : '');
 
                     const input = document.createElement('input');
                     input.type = 'text';
