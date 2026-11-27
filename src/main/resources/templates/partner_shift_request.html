@@ -122,7 +122,7 @@
                     </tbody>
                 </table>
             </div>
-            <small class="text-muted d-block mt-2">💡 入力欄を単押しで時間選択パネルが開き、<strong>ダブルクリック（2回タップ）でその場で個別消去</strong>できます。</small>
+            <small class="text-muted d-block mt-2">💡 入力欄を単押しで時間選択パネルが開き、<strong>「休み」を選ぶと退勤も自動で「休み」になり、出勤側の隣マス（翌日の入）へ移動</strong>します。退勤入力時は<strong>「休み」のマスを自動でスキップ</strong>します。<strong>ダブルクリック（2回タップ）でその場で個別消去</strong>できます。</small>
 
             <div class="mt-4 text-end">
                 <button type="submit" class="btn btn-dark px-4">希望シフトを送信する</button>
@@ -240,14 +240,26 @@
                     const inKey = `shift_in_${userId}_${monthVal}_${d}`;
                     const outKey = `shift_out_${userId}_${monthVal}_${d}`;
 
-                    const timeIn = temporaryShiftStorage[inKey] !== undefined
+                    let timeIn = temporaryShiftStorage[inKey] !== undefined
                         ? temporaryShiftStorage[inKey]
                         : (dbShifts && dbShifts[inKey] !== undefined ? dbShifts[inKey] : '');
-                    const timeOut = temporaryShiftStorage[outKey] !== undefined
+                    let timeOut = temporaryShiftStorage[outKey] !== undefined
                         ? temporaryShiftStorage[outKey]
                         : (dbShifts && dbShifts[outKey] !== undefined ? dbShifts[outKey] : '');
 
-                    if (timeIn && timeOut && timeIn !== '休み' && timeOut !== '休み') {
+                    if (timeIn === '休み' || timeOut === '休み') {
+                        timeIn = '休み';
+                        timeOut = '休み';
+                        temporaryShiftStorage[inKey] = '休み';
+                        temporaryShiftStorage[outKey] = '休み';
+                        const inEl = document.querySelector(`input[name="${inKey}"]`);
+                        const outEl = document.querySelector(`input[name="${outKey}"]`);
+                        if (inEl) inEl.value = '休み';
+                        if (outEl) outEl.value = '休み';
+                        continue;
+                    }
+
+                    if (timeIn && timeOut) {
                         if (timeIn >= timeOut) {
                             e.preventDefault();
                             alert(`🚨 【入力エラー】\n${d}日の退勤時間（${timeOut}）が出勤時間（${timeIn}）より前の時間、または同じ時間になっています。修正してください。`);
@@ -263,7 +275,7 @@
                         }
                     }
                     
-                    if ((timeIn && !timeOut && timeIn !== '休み') || (!timeIn && timeOut && timeOut !== '休み')) {
+                    if ((timeIn && !timeOut) || (!timeIn && timeOut)) {
                         e.preventDefault();
                         alert(`🚨 【入力エラー】\n${d}日の「入」と「出」のどちらか片方しか入力されていません。両方入力するか、完全に空欄にしてください。`);
                         
@@ -296,6 +308,17 @@
                 }
             });
         });
+
+        function getShiftFieldValue(fieldName) {
+            if (temporaryShiftStorage[fieldName] !== undefined) {
+                return temporaryShiftStorage[fieldName];
+            }
+            if (dbShifts && dbShifts[fieldName] !== undefined) {
+                return dbShifts[fieldName];
+            }
+            const el = document.querySelector(`input[name="${fieldName}"]`);
+            return el ? el.value : '';
+        }
 
         function saveCurrentInputsToStorage() {
             document.querySelectorAll('#shiftTableBody .shift-input').forEach(input => {
@@ -433,19 +456,92 @@
             if (activeInputEl) activeInputEl.blur();
         }
 
-        function setQuickValue(value) {
-            if (activeInputEl) {
-                activeInputEl.value = value;
-                temporaryShiftStorage[activeInputEl.name] = value;
+        function focusTargetDayInput(userId, ymStr, dayNum, targetType, lastDayOfMonth) {
+            if (dayNum <= lastDayOfMonth) {
+                if (dayNum >= 16 && currentPeriodSection === 1) {
+                    switchPeriod(2);
+                } else if (dayNum <= 15 && currentPeriodSection === 2) {
+                    switchPeriod(1);
+                }
+                const targetName = `shift_${targetType}_${userId}_${ymStr}_${dayNum}`;
+                setTimeout(() => {
+                    const targetInput = document.querySelector(`input[name="${targetName}"]`);
+                    if (targetInput) {
+                        targetInput.focus();
+                    } else {
+                        closeQuickPanel();
+                    }
+                }, 30);
+                return true;
+            }
+            return false;
+        }
 
-                const currentInputs = Array.from(document.querySelectorAll('#shiftTableBody .shift-input'));
-                const currentIndex = currentInputs.indexOf(activeInputEl);
-                
-                if (currentIndex >= 0 && currentIndex < currentInputs.length - 1) {
-                    currentInputs[currentIndex + 1].focus();
-                } else {
+        function setQuickValue(value) {
+            if (!activeInputEl) return;
+
+            const prevValue = activeInputEl.value;
+            activeInputEl.value = value;
+            temporaryShiftStorage[activeInputEl.name] = value;
+
+            const match = activeInputEl.name.match(/^shift_(in|out)_(.+?)_(\d{4}-\d{2})_(\d+)$/);
+
+            // 「休み」を選んだ場合：その日の出勤・退勤の両方を「休み」にし、出勤側の隣マス（翌日の入）へ移動
+            if (value === '休み' && match) {
+                const userId = match[2];
+                const ymStr = match[3];
+                const currentDay = Number(match[4]);
+                const [year, month] = ymStr.split('-').map(Number);
+                const lastDayOfMonth = new Date(year, month, 0).getDate();
+
+                const inName = `shift_in_${userId}_${ymStr}_${currentDay}`;
+                const outName = `shift_out_${userId}_${ymStr}_${currentDay}`;
+                temporaryShiftStorage[inName] = '休み';
+                temporaryShiftStorage[outName] = '休み';
+
+                const inEl = document.querySelector(`input[name="${inName}"]`);
+                const outEl = document.querySelector(`input[name="${outName}"]`);
+                if (inEl) inEl.value = '休み';
+                if (outEl) outEl.value = '休み';
+
+                const nextDay = currentDay + 1;
+                if (!focusTargetDayInput(userId, ymStr, nextDay, 'in', lastDayOfMonth)) {
                     closeQuickPanel();
                 }
+                return;
+            }
+
+            // 退勤（「出」）行で入力した場合：次の退勤マスのうち「休み」ではないマスへスキップして移動
+            if (match && match[1] === 'out') {
+                const userId = match[2];
+                const ymStr = match[3];
+                let candidateDay = Number(match[4]) + 1;
+                const [year, month] = ymStr.split('-').map(Number);
+                const lastDayOfMonth = new Date(year, month, 0).getDate();
+
+                while (candidateDay <= lastDayOfMonth) {
+                    const candidateOutName = `shift_out_${userId}_${ymStr}_${candidateDay}`;
+                    if (getShiftFieldValue(candidateOutName) !== '休み') {
+                        focusTargetDayInput(userId, ymStr, candidateDay, 'out', lastDayOfMonth);
+                        return;
+                    }
+                    candidateDay++;
+                }
+
+                // 月末まで「休み」ばかりの場合は次の入力欄へフォールバック（またはパネルを閉じる）
+                if (prevValue === '休み') {
+                    closeQuickPanel();
+                    return;
+                }
+            }
+
+            const currentInputs = Array.from(document.querySelectorAll('#shiftTableBody .shift-input'));
+            const currentIndex = currentInputs.indexOf(activeInputEl);
+
+            if (currentIndex >= 0 && currentIndex < currentInputs.length - 1) {
+                currentInputs[currentIndex + 1].focus();
+            } else {
+                closeQuickPanel();
             }
         }
 
